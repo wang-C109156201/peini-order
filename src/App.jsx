@@ -245,9 +245,9 @@ function App() {
       <header className="app-header">
         <div className="header-inner">
           <div className="header-left">
-            <button className="hamburger-btn">
+            {/* <button className="hamburger-btn">
               <span /><span /><span />
-            </button>
+            </button> */}
             <div className="logo">Peini Order</div>
           </div>
 
@@ -322,10 +322,10 @@ function App() {
                 </div>
               </div>
             </div>
-
-            <button className="result-next">▶</button>
           </div>
+          {/* <button className="result-next">▶</button> */}
         </div>
+        
       )}
     </div>
   );
