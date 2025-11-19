@@ -116,3 +116,17 @@ html,
   font-size: 20px;
   color: #ffffff;
 }
+
+/* 餐廳懸浮視窗區 */
+.result-overlay{
+  position: fixed;       /* 1. 固定定位，參考點是瀏覽器視窗 (Viewport) */
+  top: 50%;              /* 2. 頂部距離 50% */
+  left: 50%;             /* 3. 左側距離 50% */
+  transform: translate(-50%, -50%); /* 4. 向左上回推自身寬高的 50%，達成完全置中 */
+  
+  z-index: 9999;         /* 確保在最上層 */
+  background: rgba(255,255,2255,0.5);
+  padding: 20px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5); /* 加點陰影比較像懸浮視窗 */
+  border-radius: 8px;
+}
