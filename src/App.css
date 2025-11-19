@@ -10,21 +10,24 @@ html,
   margin: 0;
   padding: 0;
   height: 100%;
+  width: 100%;
   font-family: "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
 }
 
 .app {
-  position: relative;
-  min-height: 100vh;
+  height: 100%;
+  width: 100vw;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   color: #ffffff;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-/* 讓背景稍微暗一點，角色更凸顯 */
+/* 讓背景稍微暗一點，角色更凸顯
 .app-overlay {
   position: absolute;
   inset: 0;
@@ -34,15 +37,22 @@ html,
     rgba(0, 0, 0, 0.55)
   );
   pointer-events: none;
-}
+} */
 
+/* 頂部導覽列 */
 .app-header {
   position: relative;
   z-index: 2;
+  width: 100%;
+  padding: 16px 32px 8px;
+}
+
+.header-inner {
+  max-width: 1280px;
+  margin: 0 auto;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  justify-content: space-between;
 }
 
 .header-left {
@@ -51,17 +61,6 @@ html,
   gap: 16px;
 }
 
-.hamburger-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.4);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
 
 .hamburger-btn span {
   display: block;
@@ -72,23 +71,24 @@ html,
 }
 
 .logo {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
   letter-spacing: 2px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
-/* 模式切換按鈕 */
+/* 模式切換按鈕 – 一排膠囊 */
 .header-right {
   display: flex;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .mode-btn {
   border-radius: 999px;
-  padding: 8px 18px;
+  padding: 8px 22px;
   border: none;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.45);
   color: #ffffff;
   font-size: 14px;
   cursor: pointer;
@@ -100,225 +100,19 @@ html,
   background: #bb4b5a;
 }
 
-/* 主要區塊 */
+/* 主內容區 */
 .app-main {
-  position: relative;
-  z-index: 2;
-  height: calc(100vh - 72px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  padding-bottom: 64px;
-  padding-inline: 16px;
-}
-
-/* 提示文字 */
-.prompt-text {
-  margin-bottom: 12px;
-  font-size: 16px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
-}
-
-/* 語音按鈕 */
-.mic-button {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  margin-bottom: 16px;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
-  transition: transform 0.15s ease, box-shadow 0.15s ease,
-    background 0.15s ease;
-}
-
-.mic-button-active {
-  background: #ffdddd;
-  box-shadow: 0 0 0 6px rgba(255, 130, 130, 0.4);
-}
-
-.mic-button:hover {
-  transform: translateY(-2px);
-}
-
-.mic-icon {
-  font-size: 28px;
-  color: #222222;
-}
-
-/* 文字輸入列 */
-.input-bar {
-  width: 100%;
-  max-width: 720px;
-  display: flex;
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 32px;
-  padding: 8px 8px 8px 18px;
-  align-items: center;
-}
-
-.input-bar input {
+  align-content: center;
+  flex-wrap: wrap;
   flex: 1;
-  border: none;
-  outline: none;
-  font-size: 14px;
-  background: transparent;
-  color: #222222;
+  padding-bottom: 100px;
 }
 
-.input-bar input::placeholder {
-  color: #999999;
-}
-
-.send-btn {
-  border-radius: 999px;
-  border: none;
-  padding: 8px 16px;
-  font-size: 14px;
-  background: #bb4b5a;
-  color: #ffffff;
-  cursor: pointer;
-}
-
-/* 結果懸浮視窗 */
-.result-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 5;
-  background: rgba(0, 0, 0, 0.35);
-}
-
-.result-card {
-  position: relative;
-  max-width: 960px;
-  width: 100%;
-  border-radius: 24px;
-  background: rgba(35, 35, 35, 0.92);
-  color: #ffffff;
-  padding: 32px 32px 24px;
-  backdrop-filter: blur(16px);
-}
-
-.result-close {
-  position: absolute;
-  top: 16px;
-  right: 20px;
+.prompt-text{
   font-size: 20px;
-  border: none;
-  background: transparent;
   color: #ffffff;
-  cursor: pointer;
-}
-
-.result-content {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.7fr) auto;
-  gap: 24px;
-  align-items: flex-start;
-}
-
-.result-image-wrapper {
-  border-radius: 16px;
-  overflow: hidden;
-  background: #ffffff;
-}
-
-.result-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.result-text-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.result-description {
-  margin: 0;
-  line-height: 1.6;
-  font-size: 15px;
-}
-
-.result-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 14px;
-}
-
-.info-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.info-row.name {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.info-icon {
-  font-size: 16px;
-}
-
-.result-info a {
-  color: #ffd5d8;
-  text-decoration: none;
-}
-
-.result-info a:hover {
-  text-decoration: underline;
-}
-
-/* 右側箭頭 */
-.result-next {
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: rgba(0, 0, 0, 0.4);
-  color: #ffffff;
-  cursor: pointer;
-}
-
-/* RWD */
-@media (max-width: 900px) {
-  .result-content {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .result-next {
-    position: absolute;
-    bottom: 16px;
-    right: 24px;
-  }
-}
-
-@media (max-width: 600px) {
-  .app-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .logo {
-    font-size: 20px;
-  }
-
-  .result-card {
-    padding: 24px 18px 18px;
-  }
 }

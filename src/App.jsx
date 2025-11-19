@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 
 const MODES = {
@@ -15,12 +15,12 @@ const MODES = {
   hell: {
     key: "hell",
     label: "地獄模式",
-    bg: "/images/bg-hell.jpg",
+    bg: "src/assets/地獄.jpeg",
   },
   boss: {
     key: "boss",
     label: "霸總模式",
-    bg: "/images/bg-boss.jpg",
+    bg: "src/assets/霸總.png",
   },
 };
 
@@ -41,21 +41,80 @@ function App() {
   const [isListening, setIsListening] = useState(false);
   const [inputText, setInputText] = useState("");
   const [showResult, setShowResult] = useState(false);
+  const [supportSpeech, setSupportSpeech] = useState(true);
+
+  const recognitionRef = useRef(null);
+
+  // 初始化 Web Speech API
+  useEffect(() => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setSupportSpeech(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "zh-TW";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onresult = (event) => {
+      if (!event.results || !event.results[0] || !event.results[0][0]) return;
+      const transcript = event.results[0][0].transcript;
+      setInputText(transcript);
+      triggerAI(transcript);
+    };
+
+    recognitionRef.current = recognition;
+  }, []);
 
   const handleModeChange = (modeKey) => {
     setCurrentMode(MODES[modeKey]);
   };
 
+  const triggerAI = (text) => {
+    if (!text.trim()) return;
+
+    // TODO: 這裡串接你的後端 / AI API
+    // 目前用 mockRestaurant 當示意
+    setShowResult(true);
+  };
+
   const handleMicClick = () => {
-    // 這裡可以串接實際的語音辨識
-    setIsListening((prev) => !prev);
+    if (!recognitionRef.current) {
+      alert("這個瀏覽器暫時不支援語音辨識，可以先用打字跟我說喔！");
+      return;
+    }
+
+    if (!isListening) {
+      try {
+        recognitionRef.current.start();
+      } catch (err) {
+        // 某些瀏覽器如果重複 start 會丟錯誤
+        console.error(err);
+      }
+    } else {
+      recognitionRef.current.stop();
+    }
   };
 
   const handleSend = (e) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
-    // 這裡可以把 inputText 丟給你的後端 / AI
-    setShowResult(true);
+    triggerAI(inputText);
   };
 
   const closeResult = () => {
@@ -69,38 +128,33 @@ function App() {
         backgroundImage: `url(${currentMode.bg})`,
       }}
     >
-      {/* 半透明遮罩，讓背景比較暗 */}
       <div className="app-overlay" />
 
       {/* 頂部導覽列 */}
       <header className="app-header">
-        <div className="header-left">
-          <button className="hamburger-btn" aria-label="menu">
-            <span />
-            <span />
-            <span />
-          </button>
-          <div className="logo">Peini Order</div>
-        </div>
+        <div className="header-inner">
+          <div className="header-left">
+            <div className="logo">Peini Order</div>
+          </div>
 
-        <div className="header-right">
-          {Object.values(MODES).map((mode) => (
-            <button
-              key={mode.key}
-              className={`mode-btn ${
-                currentMode.key === mode.key ? "mode-btn-active" : ""
-              }`}
-              onClick={() => handleModeChange(mode.key)}
-            >
-              {mode.label}
-            </button>
-          ))}
+          <div className="header-right">
+            {Object.values(MODES).map((mode) => (
+              <button
+                key={mode.key}
+                className={`mode-btn ${
+                  currentMode.key === mode.key ? "mode-btn-active" : ""
+                }`}
+                onClick={() => handleModeChange(mode.key)}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
-      {/* 中央人物/背景內容區：實際圖片寫在背景層，這裡保持空白即可 */}
+      {/* 主內容區（人物背景在底圖） */}
       <main className="app-main">
-        {/* 中下方提示文字 */}
         <div className="prompt-text">
           來，說吧。妳今天想吃什麼？
         </div>
@@ -112,6 +166,11 @@ function App() {
         >
           <span className="mic-icon">🎤</span>
         </button>
+        {!supportSpeech && (
+          <div className="speech-hint">
+            你的瀏覽器不支援語音辨識，可以先用打字輸入喔。
+          </div>
+        )}
 
         {/* 文字輸入列 */}
         <form className="input-bar" onSubmit={handleSend}>
@@ -134,6 +193,11 @@ function App() {
             <button className="result-close" onClick={closeResult}>
               ✕
             </button>
+
+            {/* 左側切換箭頭（預留，如果之後有多家餐廳可以用） */}
+            {/* <button className="result-prev" aria-label="previous result">
+              ◀
+            </button> */}
 
             <div className="result-content">
               {/* 左側餐廳圖片 */}
@@ -174,18 +238,22 @@ function App() {
 
                   <div className="info-row">
                     <span className="info-icon">🔗</span>
-                    <a href={mockRestaurant.mapUrl} target="_blank" rel="noreferrer">
+                    <a
+                      href={mockRestaurant.mapUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       Google Maps 連結
                     </a>
                   </div>
                 </div>
               </div>
-
-              {/* 右側切換箭頭（之後可用來切換多家餐廳） */}
-              <button className="result-next" aria-label="next result">
-                ▶
-              </button>
             </div>
+
+            {/* 右側垂直置中的切換箭頭 */}
+            <button className="result-next" aria-label="next result">
+              ▶
+            </button>
           </div>
         </div>
       )}
