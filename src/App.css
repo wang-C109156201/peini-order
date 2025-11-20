@@ -1,136 +1,337 @@
-*,
-*::before,
-*::after {
+*, *::before, *::after {
   box-sizing: border-box;
 }
 
-body,
-html,
-#root {
+body, html, #root {
   margin: 0;
   padding: 0;
   height: 100%;
   width: 100%;
-  font-family: "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
+  font-family: "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .app {
-  height: 100%;
+  height: 100vh; /* 使用 vh 確保滿版 */
   width: 100vw;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   color: #ffffff;
-  overflow: hidden;
+  overflow: hidden; /* 防止捲軸 */
   display: flex;
   flex-direction: column;
+  position: relative;
+  transition: background-image 0.5s ease-in-out;
 }
 
-/* 讓背景稍微暗一點，角色更凸顯
+/* 遮罩層：讓背景暗一點，文字更清晰 */
 .app-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.35),
-    rgba(0, 0, 0, 0.55)
-  );
+  background: rgba(0, 0, 0, 0.3);
   pointer-events: none;
-} */
+  z-index: 1;
+}
 
 /* 頂部導覽列 */
 .app-header {
   position: relative;
-  z-index: 2;
+  z-index: 10;
   width: 100%;
-  padding: 16px 32px 8px;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: center; /* 手機版預設置中，電腦版會調整 */
 }
 
 .header-inner {
+  width: 100%;
   max-width: 1280px;
-  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
-}
-
-
-.hamburger-btn span {
-  display: block;
-  width: 16px;
-  height: 2px;
-  background: #ffffff;
-  margin: 2px 0;
 }
 
 .logo {
+  font-family: 'Pacifico', cursive, sans-serif; /* 模擬手寫感 */
   font-size: 28px;
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
-/* 模式切換按鈕 – 一排膠囊 */
+/* 模式切換按鈕區 */
 .header-right {
   display: flex;
-  gap: 12px;
-  flex-wrap: nowrap;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .mode-btn {
-  border-radius: 999px;
-  padding: 8px 22px;
-  border: none;
-  background: rgba(0, 0, 0, 0.45);
+  border-radius: 20px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.4);
   color: #ffffff;
   font-size: 14px;
   cursor: pointer;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(4px);
   white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+.mode-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .mode-btn-active {
-  background: #bb4b5a;
+  background: #bb4b5a !important;
+  border-color: #bb4b5a;
+  transform: scale(1.05);
+  font-weight: bold;
 }
 
 /* 主內容區 */
 .app-main {
+  position: relative;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  align-content: center;
-  flex-wrap: wrap;
+  justify-content: center; /* 垂直置中 */
   flex: 1;
-  padding-bottom: 100px;
-}
-
-.prompt-text{
-  font-size: 20px;
-  color: #ffffff;
-}
-
-/* 餐廳懸浮視窗區 */
-.result-overlay{
-  position: fixed;       /* 1. 固定定位，參考點是瀏覽器視窗 (Viewport) */
-  top: 50%;              /* 2. 頂部距離 50% */
-  left: 50%;             /* 3. 左側距離 50% */
-  transform: translate(-50%, -50%); /* 4. 向左上回推自身寬高的 50%，達成完全置中 */
-  
-  z-index: 9999;         /* 確保在最上層 */
-  background: rgb(15 7 7 / 50%);
   padding: 20px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.5); /* 加點陰影比較像懸浮視窗 */
-  border-radius: 8px;
-  display: flex;
+  padding-bottom: 100px; /* 留空間給底部輸入框 */
+  text-align: center;
 }
-.result-next{
-  background: rgba(255,255,2255,0);
+
+/* 麥克風按鈕 */
+.mic-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.mic-button {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.mic-button svg {
+  width: 40px;
+  height: 40px;
+  color: white;
+}
+
+.mic-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.mic-button-active {
+  background: #ef4444;
+  border-color: #ef4444;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.prompt-text {
+  font-size: 22px;
+  font-weight: 500;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  max-width: 80%;
+  line-height: 1.4;
+  min-height: 60px; /* 避免切換文字時跳動 */
+}
+
+/* 底部輸入框區域 (白色方框) */
+.input-area {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px;
+  background: white;
+  padding: 10px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  z-index: 20;
+}
+
+.input-area input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 10px 15px;
+  font-size: 16px;
+  color: #333;
+  background: transparent;
+}
+
+.input-area input::placeholder {
+  color: #999;
+}
+
+.send-btn {
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-left: 8px;
+}
+
+.send-btn:hover {
+  background: #000;
+}
+
+/* 結果懸浮視窗 */
+.result-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.result-card {
+  background: white;
+  color: #333;
+  width: 100%;
+  max-width: 400px;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.result-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  color: white;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.result-image-wrapper {
+  height: 200px;
+  overflow: hidden;
+  background: #eee;
+}
+
+.result-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.result-content {
+  padding: 24px;
+}
+
+.result-description {
+  font-size: 16px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  color: #444;
+  font-weight: 500;
+  border-left: 4px solid #bb4b5a;
+  padding-left: 12px;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.info-row.name {
+  font-size: 20px;
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 12px;
+}
+
+.info-row a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.info-row a:hover {
+  text-decoration: underline;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(50px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* RWD 調整 */
+@media (max-width: 768px) {
+  .header-inner {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .prompt-text {
+    font-size: 18px;
+  }
 }

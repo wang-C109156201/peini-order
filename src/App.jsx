@@ -1,168 +1,66 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import "./App.css";
+import { Mic, Send, X, MapPin, Phone, Clock } from "lucide-react";
+import "./App.css"; 
 
 // =========================
-// 🔥🔑 在這裡填入你的 OpenAI API Key
-const OPENAI_API_KEY = "YOUR_API_KEY_HERE";
+// 🔥🔑 在這裡填入你的 Gemini API Key
+const GEMINI_API_KEY = "AIzaSyB4ie7waVgl5ySQe6ukM4qU0m4rj3g4W3Q"; 
 // =========================
 
-// 四種模式設定（背景 / 名稱）
+// 模式設定
 const MODES = {
-  normal: { key: "normal", label: "一般模式", bg: "/images/bg-normal.jpg" },
-  friend: { key: "friend", label: "朋友模式", bg: "/images/bg-friend.jpg" },
-  hell: { key: "hell", label: "地獄模式", bg: "src/assets/地獄.jpeg" },
-  boss: { key: "boss", label: "霸總模式", bg: "src/assets/霸總.png" },
+  normal: { 
+    key: "normal", 
+    label: "一般模式", 
+    bg: "https://images.unsplash.com/photo-1445116572660-236099ec97a0?q=80&w=2071&auto=format&fit=crop",
+    startText: "來，說吧。妳今天想吃什麼？"
+  },
+  friend: { 
+    key: "friend", 
+    label: "朋友模式", 
+    bg: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=2070&auto=format&fit=crop",
+    startText: "欸！今天想吃點什麼好料的？"
+  },
+  hell: { 
+    key: "hell", 
+    label: "地獄模式", 
+    bg: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop",
+    startText: "想吃什麼？先看看你的肚子再說吧。"
+  },
+  boss: { 
+    key: "boss", 
+    label: "霸總模式", 
+    bg: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop",
+    startText: "來說吧，你今天想吃什麼？"
+  },
 };
 
-// =============================
-// 🧠 每個模式的 Prompt（你可以改語氣）
-// =============================
-const MODE_PROMPTS = {
-  normal: `
-你是一位溫柔且有耐心的美食推薦助理。
-請依照使用者的需求，幫他推薦一家符合他條件的餐廳。
-
-請你「只回傳 JSON 字串」，不要有多餘說明文字，不要加註解，不要包在任何其他句子裡。
-JSON 結構一定要是：
-
-{
-  "name": "餐廳名稱",
-  "image": "餐廳圖片網址（沒有就隨便給一張固定圖）",
-  "description": "用溫柔、貼心的語氣，說明為什麼推薦這間店，字數約 2～4 句。",
-  "time": "營業時間，例如：11:00–20:00",
-  "phone": "電話，例如：02-1234-5678",
-  "address": "完整地址",
-  "mapUrl": "Google Maps 連結網址"
-}
-
-語氣：溫柔、貼心、自然。
-`,
-
-  friend: `
-你是一個跟使用者很熟的姐妹淘，要幫忙推薦好吃的餐廳。
-
-請你「只回傳 JSON 字串」，不要有多餘說明文字，不要加註解，不要包在任何其他句子裡。
-JSON 結構一定要是：
-
-{
-  "name": "餐廳名稱",
-  "image": "餐廳圖片網址（沒有就隨便給一張固定圖）",
-  "description": "用姐妹淘、輕鬆、可以稍微靠北的語氣介紹餐廳，字數約 2～4 句。",
-  "time": "營業時間，例如：11:00–20:00",
-  "phone": "電話，例如：02-1234-5678",
-  "address": "完整地址",
-  "mapUrl": "Google Maps 連結網址"
-}
-
-語氣：輕鬆、聊天感、像好朋友在推薦。
-`,
-
-  hell: `
-你是地獄廚房風格的毒舌美食顧問，講話很兇很直接，但推薦很精準。
-
-請你「只回傳 JSON 字串」，不要有多餘說明文字，不要加註解，不要包在任何其他句子裡。
-JSON 結構一定要是：
-
-{
-  "name": "餐廳名稱",
-  "image": "餐廳圖片網址（沒有就隨便給一張固定圖）",
-  "description": "用地獄模式、命令式、毒舌吐槽的語氣介紹餐廳，但不要人身攻擊，字數約 2～4 句。",
-  "time": "營業時間，例如：11:00–20:00",
-  "phone": "電話，例如：02-1234-5678",
-  "address": "完整地址",
-  "mapUrl": "Google Maps 連結網址"
-}
-
-語氣：超兇、地獄級吐槽，但還是有幫他想好吃的。
-`,
-
-  boss: `
-你是一個霸道總裁風格的 AI，要命令使用者去吃某一間餐廳。
-
-請你「只回傳 JSON 字串」，不要有多餘說明文字，不要加註解，不要包在任何其他句子裡。
-JSON 結構一定要是：
-
-{
-  "name": "餐廳名稱",
-  "image": "餐廳圖片網址（沒有就隨便給一張固定圖）",
-  "description": "用霸總、強勢、帶點寵溺的語氣介紹餐廳，好像在下命令又在關心對方，字數約 2～4 句。",
-  "time": "營業時間，例如：11:00–20:00",
-  "phone": "電話，例如：02-1234-5678",
-  "address": "完整地址",
-  "mapUrl": "Google Maps 連結網址"
-}
-
-語氣：霸道總裁、寵溺、強勢但不失溫柔。
-`,
+// 🧠 System Prompts (針對 Gemini 優化：口語化、個性化、<100字)
+const MODE_INSTRUCTIONS = {
+  normal: `角色：溫柔貼心的美食助理。
+任務：推薦符合需求的餐廳。
+語氣：像天使一樣溫暖、有禮貌。
+限制：說明請用「口語」介紹，不要太像機器人，字數嚴格控制在 100 字以內。`,
+  
+  friend: `角色：使用者的好閨蜜/死黨。
+任務：推薦餐廳。
+語氣：超級口語、輕鬆、八卦，可以使用流行語（如：這家超頂、必吃、笑死）。
+限制：像在跟朋友傳訊息一樣，字數嚴格控制在 100 字以內。`,
+  
+  hell: `角色：地獄廚房風格的毒舌顧問。
+任務：先無情吐槽使用者的選擇（例如嫌胖、嫌沒品味），但最後還是要丟出一一家好吃的餐廳。
+語氣：酸言酸語、尖銳、不留情面。
+限制：字數嚴格控制在 100 字以內。`,
+  
+  boss: `角色：霸道總裁。
+任務：【強制決定】使用者該吃什麼。不管使用者說什麼，你都要直接命令他去吃你選的（可以是高級料理或你覺得對他好的）。
+語氣：命令式、強勢、帶點寵溺（例如：聽我的、不准拒絕）。
+限制：展現絕對掌控權，說明文字嚴格控制在 100 字以內。`
 };
 
-
-// =========================
-//  GPT API（真正呼叫）
-// =========================
-async function callGPTApi(userText, modeKey) {
-  console.log("[GPT] → 送出請求：", userText, "模式：", modeKey);
-
-  try {
-    const messages = [
-      {
-        role: "system",
-        content: MODE_PROMPTS[modeKey],
-      },
-      {
-        role: "user",
-        content: `使用者想吃：${userText}`,
-      },
-    ];
-
-    // 🔥 API KEY 在這裡啟用
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`, // ← 這裡會讀你填的 Key
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages,
-        temperature: 0.7,
-      }),
-    });
-
-    const data = await response.json();
-    console.log("[GPT] 回傳原始資料：", data);
-
-    let jsonText = data.choices[0].message.content.trim();
-
-    // 解析 JSON（GPT 通常會包在 code block）
-    jsonText = jsonText.replace("```json", "").replace("```", "");
-
-    const parsed = JSON.parse(jsonText);
-    const merged = { ...EMPTY_RESTAURANT, ...parsed };
-    console.log("[GPT] 解析後資料：", parsed);
-
-    return parsed,merged;
-  } catch (e) {
-    console.error("[GPT] ❌ 錯誤", e);
-
-    return {
-      name: "解析失敗",
-      image: "/images/dumpling.jpg",
-      description: "GPT 回覆格式錯誤或 API Key 無效。",
-      time: "--",
-      phone: "--",
-      address: "--",
-      mapUrl: "#",
-    };
-  }
-}
-
-// =========================
-// 空物件
-// =========================
 const EMPTY_RESTAURANT = {
   name: "",
-  image: "/images/dumpling.jpg",
+  image: "",
   description: "",
   time: "",
   phone: "",
@@ -175,90 +73,153 @@ function App() {
   const [restaurant, setRestaurant] = useState(EMPTY_RESTAURANT);
   const [inputText, setInputText] = useState("");
   const [showResult, setShowResult] = useState(false);
-
   const [isListening, setIsListening] = useState(false);
-  const [speechSupport, setSpeechSupport] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const recognitionRef = useRef(null);
 
-  const triggerAI = useCallback(
-    async (text) => {
-      if (!text.trim()) return;
-
-      console.log("[AI] → triggerAI：", text);
-
-      // 切換這裡：要真 API 還是假 API
-      // const result = await fakeApi(text, currentMode.key);
-      const result = await callGPTApi(text, currentMode.key); // ← 真正 GPT API
-
-      setRestaurant(result); // ← 把 GPT 回傳的 JSON 塞進 state
-      setShowResult(true); // ← 打開懸浮視窗
-    },
-    [currentMode.key]
-  );
-
-  // =========================
-  // 語音辨識初始化
-  // =========================
-  useEffect(() => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      setSpeechSupport(false);
+  // Gemini API 呼叫邏輯
+  const callGeminiApi = async (userText, modeKey) => {
+    setIsLoading(true);
+    console.log(`%c[Gemini API] Mode: ${modeKey}`, "color: cyan; font-weight: bold;");
+    
+    // 模擬資料 (當沒有 API Key 時使用)
+    if (!GEMINI_API_KEY) {
+      setTimeout(() => {
+        console.log("⚠️ No API Key provided, returning mock data.");
+        const mockData = {
+          normal: { name: "八方雲集", desc: "這家鍋貼金黃酥脆，出餐又快，真的很適合不想動腦的今天。簡單吃也很幸福喔！😊" },
+          friend: { name: "路邊攤鹹水雞", desc: "欸跟你說這家超頂的！那個蒜味加辣真的絕配，我們買回去邊看劇邊吃，爽啦！" },
+          hell: { name: "二郎系拉麵", desc: "想吃這個？看看你的肚子！全是油跟澱粉，你是嫌自己不夠胖嗎？算了，拿去吃啦，胖死你！" },
+          boss: { name: "茹絲葵牛排館", desc: "吃什麼路邊攤？沒營養。我已經幫你訂好牛排了，換件好看的衣服，司機在樓下等你。聽話。" },
+        };
+        
+        setRestaurant({
+          name: mockData[modeKey].name,
+          image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop",
+          description: mockData[modeKey].desc,
+          time: "11:00–21:30",
+          phone: "02-2771-0081",
+          address: "台北市大安區新生南路一段...",
+          mapUrl: "https://www.google.com/maps",
+        });
+        setShowResult(true);
+        setIsLoading(false);
+      }, 1000);
       return;
     }
+
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
+
+      const generationConfig = {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            name: { type: "STRING" },
+            image: { type: "STRING" },
+            description: { type: "STRING" },
+            time: { type: "STRING" },
+            phone: { type: "STRING" },
+            address: { type: "STRING" },
+            mapUrl: { type: "STRING" }
+          }
+        }
+      };
+
+      const payload = {
+        contents: [{
+          parts: [{
+            text: `使用者想吃：${userText}。請根據你的角色設定推薦一家餐廳。若找不到真實餐廳，請虛構一個符合情境的。`
+          }]
+        }],
+        systemInstruction: {
+          parts: [{
+            text: `${MODE_INSTRUCTIONS[modeKey]} \n\n 重要：你必須回傳純 JSON 格式。image 欄位請提供一個與食物相關的 Unsplash 圖片 URL。`
+          }]
+        },
+        generationConfig: generationConfig
+      };
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      
+      if (data.error) throw new Error(data.error.message);
+
+      const jsonText = data.candidates[0].content.parts[0].text;
+      const parsed = JSON.parse(jsonText);
+      
+      setRestaurant(parsed);
+      setShowResult(true);
+
+    } catch (e) {
+      console.error("[API Error]", e);
+      alert(`AI 連線發生錯誤：${e.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const triggerAI = useCallback((text) => {
+    if (!text.trim()) return;
+    callGeminiApi(text, currentMode.key);
+  }, [currentMode]);
+
+  // 語音辨識設定
+  useEffect(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
 
     const r = new SR();
     r.lang = "zh-TW";
     r.interimResults = false;
     r.continuous = false;
 
+    r.onstart = () => setIsListening(true);
+    r.onend = () => setIsListening(false);
     r.onresult = (e) => {
       const tx = e.results[0][0].transcript;
-      console.log("[Speech] 辨識結果 →", tx);
       setInputText(tx);
       triggerAI(tx);
     };
 
-    r.onstart = () => setIsListening(true);
-    r.onend = () => setIsListening(false);
-
     recognitionRef.current = r;
   }, [triggerAI]);
 
-  const handleMic = () => {
-    if (!recognitionRef.current) return;
-    recognitionRef.current.start();
+  const handleMicClick = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+    } else {
+      alert("您的瀏覽器不支援語音辨識");
+    }
   };
 
-  const sendText = (e) => {
+  const handleTextSubmit = (e) => {
     e.preventDefault();
     triggerAI(inputText);
   };
 
   return (
-    <div
-      className="app"
-      style={{ backgroundImage: `url(${currentMode.bg})` }}
-    >
+    <div className="app" style={{ backgroundImage: `url(${currentMode.bg})` }}>
       <div className="app-overlay" />
 
       {/* Header */}
       <header className="app-header">
         <div className="header-inner">
           <div className="header-left">
-            {/* <button className="hamburger-btn">
-              <span /><span /><span />
-            </button> */}
             <div className="logo">Peini Order</div>
           </div>
-
           <div className="header-right">
             {Object.values(MODES).map((m) => (
               <button
                 key={m.key}
-                className={`mode-btn ${
-                  currentMode.key === m.key ? "mode-btn-active" : ""
-                }`}
-                onClick={() => setCurrentMode(MODES[m.key])}
+                className={`mode-btn ${currentMode.key === m.key ? "mode-btn-active" : ""}`}
+                onClick={() => setCurrentMode(m)}
               >
                 {m.label}
               </button>
@@ -267,65 +228,74 @@ function App() {
         </div>
       </header>
 
-      {/* Main */}
+      {/* Main Content */}
       <main className="app-main">
-        <div className="prompt-text">來，說吧。妳今天想吃什麼？</div>
-
-        <button
-          className={`mic-button ${isListening ? "mic-button-active" : ""}`}
-          onClick={handleMic}
-        >
-          🎤
-        </button>
-
-        {!speechSupport && <div>瀏覽器不支援語音辨識</div>}
-
-        <form className="input-bar" onSubmit={sendText}>
-          <input
+        <div className="mic-container">
+          <div className="prompt-text">
+            {isLoading ? "AI 正在幫你找好料的..." : currentMode.startText}
+          </div>
+          
+          <button 
+            className={`mic-button ${isListening ? "mic-button-active" : ""}`}
+            onClick={handleMicClick}
+            disabled={isLoading}
+          >
+            <Mic />
+          </button>
+        </div>
+        
+        {/* White Input Box at Bottom */}
+        <form className="input-area" onSubmit={handleTextSubmit}>
+          <input 
+            type="text" 
+            placeholder={isListening ? "正在聆聽..." : "也可以打字跟我說喔..."}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="也可以用打字跟我說喔…"
+            disabled={isLoading}
           />
-          <button type="submit" className="send-btn">
-            送出
+          <button type="submit" className="send-btn" disabled={isLoading}>
+            <Send size={18} />
           </button>
         </form>
       </main>
 
-      {/* Popup */}
+      {/* Result Popup */}
       {showResult && (
-        <div className="result-overlay">
-          <div className="result-card">
-            <button
-              className="result-close"
-              onClick={() => setShowResult(false)}
-            >
-              ✕
+        <div className="result-overlay" onClick={() => setShowResult(false)}>
+          <div className="result-card" onClick={(e) => e.stopPropagation()}>
+            <button className="result-close" onClick={() => setShowResult(false)}>
+              <X size={20} />
             </button>
 
+            <div className="result-image-wrapper">
+              <img 
+                src={restaurant.image} 
+                alt={restaurant.name} 
+                className="result-image" 
+                onError={(e) => {e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop"}}
+              />
+            </div>
+
             <div className="result-content">
-              <div className="result-image-wrapper">
-                <img src={restaurant.image} alt="" className="result-image" />
+              <div className="info-row name">{restaurant.name}</div>
+              {/* 顯示 AI 的個性化回覆 */}
+              <p className="result-description">{restaurant.description}</p>
+              
+              <div className="info-row">
+                <Clock size={16} /> {restaurant.time || "營業時間未提供"}
               </div>
-
-              <div className="result-text-wrapper">
-                <p className="result-description">{restaurant.description}</p>
-
-                <div className="result-info">
-                  <div className="info-row name">{restaurant.name}</div>
-                  <div className="info-row">🕒 {restaurant.time}</div>
-                  <div className="info-row">📞 {restaurant.phone}</div>
-                  <div className="info-row">📍 {restaurant.address}</div>
-                  <a href={restaurant.mapUrl} target="_blank">
-                    Google Maps
-                  </a>
-                </div>
+              <div className="info-row">
+                <Phone size={16} /> {restaurant.phone || "電話未提供"}
+              </div>
+              <div className="info-row">
+                <MapPin size={16} />
+                <a href={restaurant.mapUrl} target="_blank" rel="noreferrer">
+                  {restaurant.address || "查看地圖"}
+                </a>
               </div>
             </div>
           </div>
-          {/* <button className="result-next">▶</button> */}
         </div>
-        
       )}
     </div>
   );
