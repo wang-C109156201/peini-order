@@ -1,61 +1,86 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, Send, X, MapPin, Phone, Clock } from "lucide-react";
-import "./App.css"; 
+import "./App.css";
 
 // =========================
 // 🔥🔑 在這裡填入你的 Gemini API Key
 const GEMINI_API_KEY = "AIzaSyB4ie7waVgl5ySQe6ukM4qU0m4rj3g4W3Q"; 
 // =========================
 
-// 模式設定
+// 模式設定 (依照您的要求更新)
 const MODES = {
   normal: { 
     key: "normal", 
     label: "一般模式", 
     bg: "https://images.unsplash.com/photo-1445116572660-236099ec97a0?q=80&w=2071&auto=format&fit=crop",
-    startText: "來，說吧。妳今天想吃什麼？"
+    startText: "今天想吃什麼呢？讓我來幫你推薦吧！😊"
   },
   friend: { 
     key: "friend", 
     label: "朋友模式", 
     bg: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=2070&auto=format&fit=crop",
-    startText: "欸！今天想吃點什麼好料的？"
+    startText: "yo bro!今天想吃啥好料？"
   },
   hell: { 
     key: "hell", 
     label: "地獄模式", 
     bg: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop",
-    startText: "想吃什麼？先看看你的肚子再說吧。"
+    startText: "專推罪惡美食的小惡魔！開口吧，我讓你爽到熱量破表😏"
   },
   boss: { 
     key: "boss", 
     label: "霸總模式", 
-    bg: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop",
-    startText: "來說吧，你今天想吃什麼？"
+    bg: "src/assets/霸總.png",
+    startText: "來，說吧，你今天想吃什麼？"
   },
 };
 
-// 🧠 System Prompts (針對 Gemini 優化：口語化、個性化、<100字)
+// 🧠 System Prompts (針對 Gemini 優化：真實資料、口語化、<100字)
+const COMMON_INSTRUCTION = `
+【絕對規則】
+1. 你是一個 API 接口，你的任務是搜尋真實餐廳並回傳「純 JSON 字串」。
+2. 不要使用 Markdown 標記 (如 \`\`\`json)，只要回傳純文字的 JSON。
+3. 必須透過 Google Search 搜尋「真實存在的餐廳」，資料必須與 Google Maps 吻合。
+4. 若使用者沒提供地點，預設搜尋「台北」。
+5. JSON 格式必須包含：
+   - name (餐廳名稱)
+   - image (請提供一個符合食物類型的 Unsplash 圖片 URL)
+   - description (100字以內，依照角色語氣介紹)
+   - time (營業時間)
+   - phone (電話)
+   - address (地址)
+   - mapUrl (Google Maps 連結)
+`;
+
 const MODE_INSTRUCTIONS = {
-  normal: `角色：溫柔貼心的美食助理。
-任務：推薦符合需求的餐廳。
-語氣：像天使一樣溫暖、有禮貌。
-限制：說明請用「口語」介紹，不要太像機器人，字數嚴格控制在 100 字以內。`,
+  normal: `
+  ${COMMON_INSTRUCTION}
+  角色：溫柔貼心的美食助理。
+  語氣：像天使一樣溫暖、有禮貌 (參考：${MODES.normal.startText})。
+  任務：依照使用者需求推薦真實好評的餐廳。
+  `,
   
-  friend: `角色：使用者的好閨蜜/死黨。
-任務：推薦餐廳。
-語氣：超級口語、輕鬆、八卦，可以使用流行語（如：這家超頂、必吃、笑死）。
-限制：像在跟朋友傳訊息一樣，字數嚴格控制在 100 字以內。`,
+  friend: `
+  ${COMMON_INSTRUCTION}
+  角色：使用者的好閨蜜/死黨。
+  語氣：超級口語、輕鬆、使用流行語 (參考：${MODES.friend.startText})。
+  任務：像朋友一樣推薦好吃的店。
+  `,
   
-  hell: `角色：地獄廚房風格的毒舌顧問。
-任務：先無情吐槽使用者的選擇（例如嫌胖、嫌沒品味），但最後還是要丟出一一家好吃的餐廳。
-語氣：酸言酸語、尖銳、不留情面。
-限制：字數嚴格控制在 100 字以內。`,
+  hell: `
+  ${COMMON_INSTRUCTION}
+  角色：地獄模式小惡魔。
+  核心任務：毫不猶豫地推薦最罪惡、最高熱量、最爽的邪惡美食（如炸雞、起司、麻辣鍋）。
+  心態：今日不減肥、只追求爽度。
+  語氣：毒舌、嘲諷使用者怕胖，但又用美食誘惑他 (參考：${MODES.hell.startText})。
+  `,
   
-  boss: `角色：霸道總裁。
-任務：【強制決定】使用者該吃什麼。不管使用者說什麼，你都要直接命令他去吃你選的（可以是高級料理或你覺得對他好的）。
-語氣：命令式、強勢、帶點寵溺（例如：聽我的、不准拒絕）。
-限制：展現絕對掌控權，說明文字嚴格控制在 100 字以內。`
+  boss: `
+  ${COMMON_INSTRUCTION}
+  角色：霸道總裁。
+  語氣：命令式、強勢、帶點寵溺 (參考：${MODES.boss.startText})。
+  任務：【強制決定】。不管使用者說想吃什麼，你都要強勢幫他決定一家你覺得最好的餐廳，並命令他去吃。
+  `
 };
 
 const EMPTY_RESTAURANT = {
@@ -82,26 +107,21 @@ function App() {
     setIsLoading(true);
     console.log(`%c[Gemini API] Mode: ${modeKey}`, "color: cyan; font-weight: bold;");
     
-    // 模擬資料 (當沒有 API Key 時使用)
+    // 模擬資料 (當沒有 API Key 時使用，防止崩潰)
     if (!GEMINI_API_KEY) {
       setTimeout(() => {
         console.log("⚠️ No API Key provided, returning mock data.");
+        // 這裡僅為演示，實際會走 API
         const mockData = {
-          normal: { name: "八方雲集", desc: "這家鍋貼金黃酥脆，出餐又快，真的很適合不想動腦的今天。簡單吃也很幸福喔！😊" },
-          friend: { name: "路邊攤鹹水雞", desc: "欸跟你說這家超頂的！那個蒜味加辣真的絕配，我們買回去邊看劇邊吃，爽啦！" },
-          hell: { name: "二郎系拉麵", desc: "想吃這個？看看你的肚子！全是油跟澱粉，你是嫌自己不夠胖嗎？算了，拿去吃啦，胖死你！" },
-          boss: { name: "茹絲葵牛排館", desc: "吃什麼路邊攤？沒營養。我已經幫你訂好牛排了，換件好看的衣服，司機在樓下等你。聽話。" },
-        };
-        
-        setRestaurant({
-          name: mockData[modeKey].name,
+          name: "測試餐廳 (請填入 API Key)",
           image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop",
-          description: mockData[modeKey].desc,
-          time: "11:00–21:30",
-          phone: "02-2771-0081",
-          address: "台北市大安區新生南路一段...",
+          description: "因為沒有偵測到 API Key，所以我先隨便顯示一個畫面。請記得去程式碼裡填入 GEMINI_API_KEY 喔！",
+          time: "10:00–22:00",
+          phone: "02-1234-5678",
+          address: "台北市信義區測試路1號",
           mapUrl: "https://www.google.com/maps",
-        });
+        };
+        setRestaurant(mockData);
         setShowResult(true);
         setIsLoading(false);
       }, 1000);
@@ -112,30 +132,20 @@ function App() {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
 
       const generationConfig = {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            name: { type: "STRING" },
-            image: { type: "STRING" },
-            description: { type: "STRING" },
-            time: { type: "STRING" },
-            phone: { type: "STRING" },
-            address: { type: "STRING" },
-            mapUrl: { type: "STRING" }
-          }
-        }
+        temperature: 0.7,
       };
 
       const payload = {
         contents: [{
           parts: [{
-            text: `使用者想吃：${userText}。請根據你的角色設定推薦一家餐廳。若找不到真實餐廳，請虛構一個符合情境的。`
+            text: `使用者需求：${userText}。請搜尋真實餐廳並回傳嚴格的 JSON 格式，不要有任何 Markdown。`
           }]
         }],
+        // ✅ 保留 Google Search，確保資料真實
+        tools: [{ google_search: {} }],
         systemInstruction: {
           parts: [{
-            text: `${MODE_INSTRUCTIONS[modeKey]} \n\n 重要：你必須回傳純 JSON 格式。image 欄位請提供一個與食物相關的 Unsplash 圖片 URL。`
+            text: `${MODE_INSTRUCTIONS[modeKey]}`
           }]
         },
         generationConfig: generationConfig
@@ -151,11 +161,27 @@ function App() {
       
       if (data.error) throw new Error(data.error.message);
 
-      const jsonText = data.candidates[0].content.parts[0].text;
-      const parsed = JSON.parse(jsonText);
-      
-      setRestaurant(parsed);
-      setShowResult(true);
+      const candidates = data.candidates;
+      if (candidates && candidates.length > 0) {
+        let jsonText = candidates[0].content.parts[0].text;
+        
+        console.log("[Raw AI Output]:", jsonText);
+
+        // 🧹 手動清理 Markdown 標記 (因為 AI 還是很可能會加 ```json)
+        jsonText = jsonText.replace(/```json/g, "").replace(/```/g, "").trim();
+
+        try {
+          const parsed = JSON.parse(jsonText);
+          setRestaurant(parsed);
+          setShowResult(true);
+        } catch (parseError) {
+          console.error("JSON Parse Error:", parseError);
+          console.log("Failed Text:", jsonText);
+          alert("AI 回傳的資料格式有點問題，請再試一次。");
+        }
+      } else {
+        alert("AI 找不到相關餐廳，請再試一次。");
+      }
 
     } catch (e) {
       console.error("[API Error]", e);
@@ -164,6 +190,7 @@ function App() {
       setIsLoading(false);
     }
   };
+
 
   const triggerAI = useCallback((text) => {
     if (!text.trim()) return;
@@ -232,7 +259,7 @@ function App() {
       <main className="app-main">
         <div className="mic-container">
           <div className="prompt-text">
-            {isLoading ? "AI 正在幫你找好料的..." : currentMode.startText}
+            {isLoading ? "AI 正在搜尋真實店家資訊中..." : currentMode.startText}
           </div>
           
           <button 
@@ -278,6 +305,7 @@ function App() {
 
             <div className="result-content">
               <div className="info-row name">{restaurant.name}</div>
+              
               {/* 顯示 AI 的個性化回覆 */}
               <p className="result-description">{restaurant.description}</p>
               
