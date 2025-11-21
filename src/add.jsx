@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, Send, X, MapPin, Phone, Clock, Loader2 } from "lucide-react";
-import "./App.css";
+
+// ⚠️ 注意：請在您的本地專案中自行 import CSS
+// import "./App.css";
 
 // =========================
 // 🔥🔑 在這裡填入你的 Gemini API Key
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+const GEMINI_API_KEY = ""; 
 // =========================
 
 // 模式設定
@@ -18,7 +20,7 @@ const MODES = {
   friend: { 
     key: "friend", 
     label: "朋友模式", 
-    bg: "https://images.unsplash.com/photo-1758272134196-1ab895629bce?q=80&w=1631&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    bg: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=2070&auto=format&fit=crop",
     startText: "yo bro!今天想吃啥好料？"
   },
   hell: { 
@@ -30,7 +32,7 @@ const MODES = {
   boss: { 
     key: "boss", 
     label: "霸總模式", 
-    bg: "public/霸總.png", 
+    bg: "src/assets/霸總.png", 
     startText: "來，說吧，你今天想吃什麼？"
   },
 };
@@ -44,7 +46,7 @@ const COMMON_INSTRUCTION = `
 4. 若使用者沒提供地點，預設搜尋「台北」。
 5. JSON 格式必須包含：
    - name (餐廳名稱)
-   - image (請提供google map 上或是google 提供的圖片若是無圖片則選擇一個符合食物類型的 Unsplash 圖片 URL)
+   - image (請提供一個符合食物類型的 Unsplash 圖片 URL)
    - description (100字以內，依照角色語氣介紹)
    - time (營業時間)
    - phone (電話)
@@ -56,30 +58,27 @@ const MODE_INSTRUCTIONS = {
   normal: `
   ${COMMON_INSTRUCTION}
   角色：溫柔貼心的美食助理。
-  語氣：像天使一樣溫暖、有禮貌 (參考：${MODES.normal.startText})。
-  任務：依照使用者需求推薦真實好評的餐廳。
+  語氣：像天使一樣溫暖、有禮貌。
   `,
   
   friend: `
   ${COMMON_INSTRUCTION}
   角色：使用者的好閨蜜/死黨。
-  語氣：超級口語、輕鬆、使用流行語 (參考：${MODES.friend.startText})。
-  任務：像朋友一樣推薦好吃的店。
+  語氣：超級口語、輕鬆、使用流行語。
   `,
   
   hell: `
   ${COMMON_INSTRUCTION}
   角色：地獄模式小惡魔。
-  核心任務：毫不猶豫地推薦最罪惡、最高熱量、最爽的邪惡美食（如炸雞、起司、麻辣鍋）。
-  心態：今日不減肥、只追求爽度。
-  語氣：毒舌、嘲諷使用者怕胖，但又用美食誘惑他 (參考：${MODES.hell.startText})。
+  核心任務：毫不猶豫地推薦最罪惡、最高熱量、最爽的邪惡美食。
+  語氣：毒舌、嘲諷使用者怕胖，但又用美食誘惑他。
   `,
   
   boss: `
   ${COMMON_INSTRUCTION}
   角色：霸道總裁。
-  語氣：命令式、強勢、帶點寵溺 (參考：${MODES.boss.startText})。
-  任務：【強制決定】。不管使用者說想吃什麼，你都要強勢幫他決定一家你覺得好的餐廳，並命令他去吃。
+  語氣：命令式、強勢、帶點寵溺。
+  任務：【強制決定】。不管使用者說想吃什麼，你都要強勢幫他決定一家你覺得最好的真實餐廳。
   `
 };
 
@@ -93,6 +92,22 @@ const EMPTY_RESTAURANT = {
   mapUrl: "#",
 };
 
+// 注入必要的 CSS (Loader 動畫 & 關閉按鈕樣式)
+// 這樣即使外部 CSS 沒設定到，這裡也能正常運作
+const extraStyles = `
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  animation: spin 1s linear infinite;
+}
+/* 確保懸浮視窗有關閉按鈕的定位環境 */
+.result-card {
+  position: relative; 
+}
+`;
+
 function App() {
   const [currentMode, setCurrentMode] = useState(MODES.normal);
   const [restaurant, setRestaurant] = useState(EMPTY_RESTAURANT);
@@ -101,6 +116,14 @@ function App() {
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const recognitionRef = useRef(null);
+
+  // 注入樣式
+  useEffect(() => {
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = extraStyles;
+    document.head.appendChild(styleSheet);
+    return () => document.head.removeChild(styleSheet);
+  }, []);
 
   // Gemini API 呼叫邏輯
   const callGeminiApi = async (userText, modeKey) => {
@@ -122,7 +145,7 @@ function App() {
         setRestaurant(mockData);
         setShowResult(true);
         setIsLoading(false);
-      }, 1000); //  Loading 動畫
+      }, 2000); // 稍微加長模擬時間以展示 Loading 動畫
       return;
     }
 
@@ -328,7 +351,7 @@ function App() {
                 zIndex: 20, // 確保在最上層
                 boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
               }}
-            >X
+            >
               <X size={20} />
             </button>
 
