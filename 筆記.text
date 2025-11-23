@@ -1,36 +1,46 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, Send, X, MapPin, Phone, Clock, Loader2 } from "lucide-react";
-import "./App.css";
+
+// ⚠️ 注意：請在您的本地專案中自行 import CSS
+// import "./App.css";
 
 // =========================
-// 🔥🔑 在這裡填入你的 Gemini API Key
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+// 🔥🔑 API Key 設定區
+// =========================
+
+// 💡 在您的本地 Vite 專案或上傳 GitHub 時，請使用下面這行：
+// const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "YOUR_KEY_HERE";
+
+// 👇 目前預覽先用空字串 (請直接將 Key 填入引號中，或在本地端改用上面的環境變數寫法)
+const GEMINI_API_KEY = ""; 
+
 // =========================
 
 // 模式設定
 const MODES = {
-  normal: {
-    key: "normal",
-    label: "一般模式",
+  normal: { 
+    key: "normal", 
+    label: "一般模式", 
     bg: "https://images.unsplash.com/photo-1445116572660-236099ec97a0?q=80&w=2071&auto=format&fit=crop",
     startText: "今天想吃什麼呢？讓我來幫你推薦吧！😊"
   },
-  friend: {
-    key: "friend",
-    label: "朋友模式",
-    bg: "https://images.unsplash.com/photo-1758272134196-1ab895629bce?q=80&w=1631&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+  friend: { 
+    key: "friend", 
+    label: "朋友模式", 
+    bg: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=2070&auto=format&fit=crop",
     startText: "yo bro!今天想吃啥好料？"
   },
-  hell: {
-    key: "hell",
-    label: "地獄模式",
+  hell: { 
+    key: "hell", 
+    label: "地獄模式", 
     bg: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop",
     startText: "專推罪惡美食的小惡魔！開口吧，我讓你爽到熱量破表😏"
   },
-  boss: {
-    key: "boss",
-    label: "霸總模式",
-    bg: "public/霸總.png",
+  boss: { 
+    key: "boss", 
+    label: "霸總模式", 
+    // ⚠️ 部署到 GitHub Pages 時，本地圖片路徑可能需要調整，建議使用 import 導入圖片或將圖片放在 public 資料夾
+    bg: "src/assets/霸總.png", 
     startText: "來，說吧，你今天想吃什麼？"
   },
 };
@@ -44,7 +54,7 @@ const COMMON_INSTRUCTION = `
 4. 若使用者沒提供地點，預設搜尋「台北」。
 5. JSON 格式必須包含：
    - name (餐廳名稱)
-   - image (請提供google map 上或是google 提供的圖片若是無圖片則選擇一個符合食物類型的 Unsplash 圖片 URL)
+   - image (請提供一個符合食物類型的 Unsplash 圖片 URL)
    - description (100字以內，依照角色語氣介紹)
    - time (營業時間)
    - phone (電話)
@@ -56,30 +66,27 @@ const MODE_INSTRUCTIONS = {
   normal: `
   ${COMMON_INSTRUCTION}
   角色：溫柔貼心的美食助理。
-  語氣：像天使一樣溫暖、有禮貌 (參考：${MODES.normal.startText})。
-  任務：依照使用者需求推薦真實好評的餐廳。
+  語氣：像天使一樣溫暖、有禮貌。
   `,
-
+  
   friend: `
   ${COMMON_INSTRUCTION}
   角色：使用者的好閨蜜/死黨。
-  語氣：超級口語、輕鬆、使用流行語 (參考：${MODES.friend.startText})。
-  任務：像朋友一樣推薦好吃的店。
+  語氣：超級口語、輕鬆、使用流行語。
   `,
-
+  
   hell: `
   ${COMMON_INSTRUCTION}
   角色：地獄模式小惡魔。
-  核心任務：毫不猶豫地推薦最罪惡、最高熱量、最爽的邪惡美食（如炸雞、起司、麻辣鍋）。
-  心態：今日不減肥、只追求爽度。
-  語氣：毒舌、嘲諷使用者怕胖，但又用美食誘惑他 (參考：${MODES.hell.startText})。
+  核心任務：毫不猶豫地推薦最罪惡、最高熱量、最爽的邪惡美食。
+  語氣：毒舌、嘲諷使用者怕胖，但又用美食誘惑他。
   `,
-
+  
   boss: `
   ${COMMON_INSTRUCTION}
   角色：霸道總裁。
-  語氣：命令式、強勢、帶點寵溺 (參考：${MODES.boss.startText})。
-  任務：【強制決定】。不管使用者說想吃什麼，你都要強勢幫他決定一家你覺得好的餐廳，並命令他去吃。
+  語氣：命令式、強勢、帶點寵溺。
+  任務：【強制決定】。不管使用者說想吃什麼，你都要強勢幫他決定一家你覺得最好的真實餐廳。
   `
 };
 
@@ -93,6 +100,21 @@ const EMPTY_RESTAURANT = {
   mapUrl: "#",
 };
 
+// 注入必要的 CSS (Loader 動畫 & 關閉按鈕樣式)
+const extraStyles = `
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  animation: spin 1s linear infinite;
+}
+/* 確保懸浮視窗有關閉按鈕的定位環境 */
+.result-card {
+  position: relative; 
+}
+`;
+
 function App() {
   const [currentMode, setCurrentMode] = useState(MODES.normal);
   const [restaurant, setRestaurant] = useState(EMPTY_RESTAURANT);
@@ -102,27 +124,35 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const recognitionRef = useRef(null);
 
+  // 注入樣式
+  useEffect(() => {
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = extraStyles;
+    document.head.appendChild(styleSheet);
+    return () => document.head.removeChild(styleSheet);
+  }, []);
+
   // Gemini API 呼叫邏輯
   const callGeminiApi = async (userText, modeKey) => {
     setIsLoading(true);
     console.log(`%c[Gemini API] Mode: ${modeKey}`, "color: cyan; font-weight: bold;");
-
+    
     if (!GEMINI_API_KEY) {
       setTimeout(() => {
         console.log("⚠️ No API Key provided, returning mock data.");
         const mockData = {
-          name: "測試餐廳 (請填入 API Key)",
+          name: "【測試模式】請設定 API Key",
           image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop",
-          description: "請填入 GEMINI_API_KEY 才能搜尋真實餐廳喔！",
-          time: "10:00–22:00",
-          phone: "02-1234-5678",
-          address: "台北市信義區測試路1號",
+          description: "目前尚未偵測到 API Key。若已上傳至 GitHub，請確認是否已設定環境變數，或在 Google Cloud Console 設定網域限制後直接填入 Key。",
+          time: "24H",
+          phone: "0800-000-123",
+          address: "請參閱 GitHub 部署說明",
           mapUrl: "https://www.google.com/maps",
         };
         setRestaurant(mockData);
         setShowResult(true);
         setIsLoading(false);
-      }, 1000); //  Loading 動畫
+      }, 2000); 
       return;
     }
 
@@ -155,19 +185,19 @@ function App() {
       });
 
       const data = await response.json();
-
+      
       if (data.error) throw new Error(data.error.message);
 
       const candidates = data.candidates;
       if (candidates && candidates.length > 0) {
         let jsonText = candidates[0].content.parts[0].text;
-
+        
         console.log("[Raw AI Output]:", jsonText);
-
+        
         // 🔥 關鍵修正：使用正規表達式只抓取 { ... } 範圍內的文字
         // 這樣就算 AI 在前面講廢話，或在後面加註解，我們也能精準抓到 JSON
         const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-
+        
         if (jsonMatch) {
           jsonText = jsonMatch[0]; // 只取匹配到的 JSON 部分
           try {
@@ -183,12 +213,18 @@ function App() {
           console.error("No JSON found in response");
           alert("AI 沒有回傳正確的餐廳資料，請再試一次。");
         }
+
       } else {
         alert("AI 找不到相關餐廳，請再試一次。");
       }
+
     } catch (e) {
       console.error("[API Error]", e);
-      alert(`AI 連線發生錯誤：${e.message}`);
+      if (e.message.includes("403") || e.message.includes("API key not valid")) {
+        alert("API Key 無效或被拒絕。請檢查 Google Cloud Console 的網域限制設定。");
+      } else {
+        alert(`AI 連線發生錯誤：${e.message}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -283,8 +319,8 @@ function App() {
           <div className="prompt-text">
             {isLoading ? "..." : currentMode.startText}
           </div>
-
-          <button
+          
+          <button 
             className={`mic-button ${isListening ? "mic-button-active" : ""}`}
             onClick={handleMicClick}
             disabled={isLoading}
@@ -292,10 +328,10 @@ function App() {
             <Mic />
           </button>
         </div>
-
+        
         <form className="input-area" onSubmit={handleTextSubmit}>
-          <input
-            type="text"
+          <input 
+            type="text" 
             placeholder={isListening ? "正在聆聽..." : "也可以打字跟我說喔..."}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
@@ -310,14 +346,14 @@ function App() {
       {showResult && (
         <div className="result-overlay" onClick={() => setShowResult(false)}>
           {/* 2. 結果卡片與關閉按鈕 */}
-          <div
-            className="result-card"
+          <div 
+            className="result-card" 
             onClick={(e) => e.stopPropagation()}
             style={{ position: 'relative' }} // 確保絕對定位的按鈕是相對於這張卡片
           >
             {/* 明顯的右上角關閉按鈕 */}
-            <button
-              className="result-close"
+            <button 
+              className="result-close" 
               onClick={() => setShowResult(false)}
               style={{
                 position: 'absolute',
@@ -336,23 +372,23 @@ function App() {
                 zIndex: 20, // 確保在最上層
                 boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
               }}
-            >X
+            >
               <X size={20} />
             </button>
 
             <div className="result-image-wrapper">
-              <img
-                src={restaurant.image}
-                alt={restaurant.name}
-                className="result-image"
-                onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop" }}
+              <img 
+                src={restaurant.image} 
+                alt={restaurant.name} 
+                className="result-image" 
+                onError={(e) => {e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop"}}
               />
             </div>
 
             <div className="result-content">
               <div className="info-row name">{restaurant.name}</div>
               <p className="result-description">{restaurant.description}</p>
-
+              
               <div className="info-row">
                 <Clock size={16} /> {restaurant.time || "營業時間未提供"}
               </div>
