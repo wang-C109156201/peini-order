@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, Send, X, MapPin, Phone, Clock, Loader2 } from "lucide-react";
 import "./App.css";
+import bossBg from "src/assets/霸總.png";
 
 // =========================
 // 🔥🔑 在這裡填入你的 Gemini API Key
@@ -30,7 +31,7 @@ const MODES = {
   boss: {
     key: "boss",
     label: "霸總模式",
-    bg: "public/霸總.png",
+    bg: bossBg,
     startText: "來，說吧，你今天想吃什麼？"
   },
 };
