@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, Send, X, MapPin, Phone, Clock, Loader2 } from "lucide-react";
 import "./App.css";
-import bossBg from "src/assets/霸總.png";
+import bossBg from "./assets/霸總.png";
 
 // =========================
 // 🔥🔑 在這裡填入你的 Gemini API Key
@@ -290,20 +290,20 @@ function App() {
             onClick={handleMicClick}
             disabled={isLoading}
           >
-            <Mic />
+            <Mic color="#ffffff"/>
           </button>
         </div>
 
         <form className="input-area" onSubmit={handleTextSubmit}>
           <input
             type="text"
-            placeholder={isListening ? "正在聆聽..." : "也可以打字跟我說喔..."}
+            placeholder={isListening ? "正在聆聽..." : "也可以打字跟我說喔～"}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={isLoading}
           />
           <button type="submit" className="send-btn" disabled={isLoading}>
-            <Send size={18} />
+            <Send color="#ffffffff"/>
           </button>
         </form>
       </main>

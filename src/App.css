@@ -198,24 +198,26 @@ body, html, #root {
 .input-area input::placeholder {
   color: #999;
 }
-
 .send-btn {
-  background: #333;
-  color: white;
-  border: none;
-  border-radius: 50%;
   width: 40px;
   height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0);
+  border: 2px solid rgba(255, 255, 255, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: background 0.2s;
-  margin-left: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  padding: 0;
+}
+.send-btn svg {
+  width: 20px;
+  height: 20px;
+  color: rgb(255, 255, 255);
 }
 
 .send-btn:hover {
-  background: #000;
+  background: #555; /* 加一點懸停效果 */
 }
 
 /* 結果懸浮視窗 */
