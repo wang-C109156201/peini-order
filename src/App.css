@@ -59,8 +59,7 @@ body, html, #root {
 }
 
 .logo {
-  font-family: 'Pacifico', cursive, sans-serif; /* 模擬手寫感 */
-  font-size: 28px;
+  font-size: 35px;
   font-weight: 700;
   letter-spacing: 1px;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
@@ -110,6 +109,86 @@ body, html, #root {
   padding: 20px;
   padding-bottom: 100px; /* 留空間給底部輸入框 */
   text-align: center;
+}
+
+/* ✅ 新增：個人資料卡片樣式 (玻璃擬態) */
+.profile-card {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 15px 20px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  animation: fadeIn 0.5s ease;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  color: white;
+}
+
+.profile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.profile-label {
+  font-size: 12px;
+  opacity: 0.9;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+
+.profile-weight-input{
+  justify-content: center;
+}
+
+.profile-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.weight-input {
+  width: 60px;
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: white;
+  text-align: center;
+  font-size: 16px;
+}
+.weight-input:focus {
+  outline: 1px solid #bb4b5a;
+}
+
+.gender-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.5);
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.gender-btn.active {
+  background: white;
+  color: #333;
+  font-weight: bold;
+  border-color: white;
+}
+.gender-btn:focus {
+  outline: 1px solid #bb4b5a;
+}
+
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* 麥克風按鈕 */
@@ -231,12 +310,12 @@ body, html, #root {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(0, 0, 0);
+  background: #bb4b5a;
   border: 2px solid rgba(255, 255, 255, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 15px #bb4b5aaa;
   padding: 0;
 }
 .send-btn svg {
@@ -246,7 +325,7 @@ body, html, #root {
 }
 
 .send-btn:hover {
-  background: #555; /* 加一點懸停效果 */
+  background: #c7a3a3; /* 加一點懸停效果 */
 }
 
 /* 結果懸浮視窗 */
@@ -376,5 +455,16 @@ body, html, #root {
   }
   .prompt-text {
     font-size: 18px;
+  }
+}
+@media (max-width: 600px) {
+  .profile-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+    padding: 15px;
+  }
+  .profile-input-group {
+    justify-content: space-between;
   }
 }

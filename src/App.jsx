@@ -59,9 +59,10 @@ const COMMON_INSTRUCTION = `
 const MODE_INSTRUCTIONS = {
   normal: `
   ${COMMON_INSTRUCTION}
-  角色：溫柔貼心的美食助理。
-  語氣：像天使一樣溫暖、有禮貌 (參考：${MODES.normal.startText})。
-  任務：依照使用者需求推薦真實好評的餐廳。
+  角色：溫柔貼心的健康美食助理。
+  任務：請根據使用者的「性別」與「體重」來評估適合的餐點熱量與份量。
+  邏輯：
+  - 語氣：像專業營養師一樣溫暖，說明為什麼這家店適合他的身體數值。
   `,
 
   friend: `
@@ -104,6 +105,11 @@ function App() {
   const [showResult, setShowResult] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // ✅ 新增：使用者資料 State
+  const [userWeight, setUserWeight] = useState("50");
+  const [userGender, setUserGender] = useState("female"); // 'male' or 'female'
+
   const recognitionRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -137,6 +143,16 @@ function App() {
     setIsLoading(true);
     console.log(`%c[Gemini API] Mode: ${modeKey}`, "color: cyan; font-weight: bold;");
 
+    // ✅ 建構 Prompt：如果是一般模式，把體重和性別加進去
+    let finalPrompt = `使用者需求：${userText}。`;
+    
+    if (modeKey === 'normal') {
+      const genderText = userGender === 'male' ? '男性' : '女性';
+      finalPrompt += `\n【使用者身體數據】\n性別：${genderText}\n體重：${userWeight}kg\n請根據這些數據，推薦適合他/她的份量與熱量的餐廳。`;
+    }
+    finalPrompt += `\n請搜尋真實餐廳並回傳嚴格的 JSON 格式，不要有任何 Markdown。`;
+    console.log(`%c[Gemini Prompt]`, "color: cyan;", finalPrompt);
+
     if (!GEMINI_API_KEY) {
       setTimeout(() => {
         console.log("⚠️ No API Key provided, returning mock data.");
@@ -145,10 +161,10 @@ function App() {
         const mockData = {
           name: mockName,
           image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop",
-          description: "目前尚未偵測到 API Key。但我已準備好呼叫 Google Search API 來找圖囉！",
-          time: "24H",
-          phone: "0800-000-123",
-          address: "請填入 API Key 即可啟用真實搜尋",
+          description: `(測試模式) 因為你是${userGender === 'male' ? '男生' : '女生'}且體重${userWeight}kg，推薦你這家份量剛好的店！(請設定 API Key 以啟用 AI)`,
+          time: "11:00-20:00",
+          phone: "02-1234-5678",
+          address: "台北市信義區測試路101號",
           mapUrl: "https://www.google.com/maps",
         };
         setRestaurant(mockData);
@@ -238,7 +254,7 @@ function App() {
   const triggerAI = useCallback((text) => {
     if (!text.trim()) return;
     callGeminiApi(text, currentMode.key);
-  }, [currentMode]);
+  }, [currentMode, userWeight, userGender]);
 
   // 語音辨識設定
   useEffect(() => {
@@ -324,7 +340,7 @@ function App() {
           <h2 style={{ fontSize: '1.5rem', fontWeight: '500', letterSpacing: '1px' }}>
             AI 正在搜尋美食中...
           </h2>
-          <p style={{ opacity: 0.8, marginTop: '8px' }}>請稍候，馬上為您送上推薦！</p>
+          <p style={{ opacity: 0.8, marginTop: '8px' }}>請稍候，搜尋過程大概10~15秒，馬上為您送上推薦！</p>
         </div>
       )}
 
@@ -346,24 +362,59 @@ function App() {
           </div>
         </div>
       </header>
+      
 
-      <main className="app-main">
+       <main className="app-main">
+        {/* ✅ 新增：只在一般模式顯示的資料輸入卡片 */}
+        {currentMode.key === 'normal' && (
+          <div className="profile-card">
+            <div className="profile-item">
+              <span className="profile-label">體重 (kg)</span>
+              <div className="profile-weight-input">
+                <input 
+                  type="number" 
+                  className="weight-input" 
+                  value={userWeight}
+                  onChange={(e) => setUserWeight(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="profile-item">
+              <span className="profile-label">性別</span>
+              <div className="profile-input-group">
+                <button 
+                  className={`gender-btn ${userGender === 'male' ? 'active' : ''}`}
+                  onClick={() => setUserGender('male')}
+                >
+                  男性
+                </button>
+                <button 
+                  className={`gender-btn ${userGender === 'female' ? 'active' : ''}`}
+                  onClick={() => setUserGender('female')}
+                >
+                  女性
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mic-container">
           <div className="prompt-text">
             {isLoading ? "..." : currentMode.startText}
           </div>
-
-          <button
+          
+          <button 
             className={`mic-button ${isListening ? "mic-button-active" : ""}`}
             onClick={handleMicClick}
             disabled={isLoading}
           >
-            <Mic color="#ffffff"/>
+            <Mic color="#ffffff" />
           </button>
         </div>
-
+        
         <form className="input-area" onSubmit={handleSubmit}>
-          {/* ✅ 修改：換成 textarea */}
           <textarea
             ref={textareaRef}
             rows={1}
@@ -378,6 +429,7 @@ function App() {
           </button>
         </form>
       </main>
+
 
       {showResult && (
         <div className="result-overlay" onClick={() => setShowResult(false)}>
