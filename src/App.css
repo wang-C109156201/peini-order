@@ -169,20 +169,48 @@ body, html, #root {
 }
 
 /* 底部輸入框區域 (白色方框) */
+/* ✅ 輸入框區域的排版 - 改為 flex-end 對齊底部 */
 .input-area {
   position: absolute;
-  bottom: 70px;
+  bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
   width: 90%;
   max-width: 600px;
   background: white;
-  padding: 10px;
-  border-radius: 30px;
+  padding: 8px 12px;
+  border-radius: 24px;
   display: flex;
-  align-items: center;
+  align-items: flex-end; /* 按鈕靠下對齊 */
   box-shadow: 0 4px 20px rgba(0,0,0,0.3);
   z-index: 20;
+  transition: all 0.2s ease;
+}
+
+/* ✅ 改用 textarea 樣式 */
+.input-area textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 8px 4px;
+  font-size: 16px;
+  color: #333;
+  background: transparent;
+  resize: none; /* 禁止手動拉大 */
+  overflow-y: auto; /* 超過高度顯示捲軸 */
+  max-height: 120px; /* 最大高度 */
+  min-height: 24px;  /* 最小高度 */
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+/* 隱藏捲軸但保留功能 (美觀用) */
+.input-area textarea::-webkit-scrollbar {
+  width: 4px;
+}
+.input-area textarea::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 2px;
 }
 
 .input-area input {
@@ -198,6 +226,7 @@ body, html, #root {
 .input-area input::placeholder {
   color: #999;
 }
+
 .send-btn {
   width: 40px;
   height: 40px;

@@ -4,8 +4,10 @@ import "./App.css";
 import bossBg from "./assets/霸總.png";
 
 // =========================
-// 🔥🔑 在這裡填入你的 Gemini API Key
+// 🔥🔑 Gemini API Key and Custom Search API
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+const GOOGLE_SEARCH_ENGINE_ID = import.meta.env.VITE_SEARCH_ENGINE_ID || "";
+const GOOGLE_SEARCH_API_KEY = import.meta.env.VITE_GOOGLE_SEARCH_KEY || "";
 // =========================
 
 // 模式設定
@@ -43,9 +45,10 @@ const COMMON_INSTRUCTION = `
 2. 不要使用 Markdown 標記 (如 \`\`\`json)，只要回傳純文字的 JSON。
 3. 必須透過 Google Search 搜尋「真實存在的餐廳」，資料必須與 Google Maps 吻合。
 4. 若使用者沒提供地點，預設搜尋「台北」。
-5. JSON 格式必須包含：
+5. 若使用者沒提供想吃的食物，預設搜尋「熱門餐廳」。
+6. JSON 格式必須包含：
    - name (餐廳名稱)
-   - image (請提供google map 上或是google 提供的圖片若是無圖片則選擇一個符合食物類型的 Unsplash 圖片 URL)
+   - image (請留空字串 ""，因為我們會用前端程式碼去呼叫 Google 圖片搜尋 API 來填入)
    - description (100字以內，依照角色語氣介紹)
    - time (營業時間)
    - phone (電話)
@@ -102,6 +105,32 @@ function App() {
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const recognitionRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  // 🔎 新增：呼叫 Google Custom Search API 找圖片
+  const fetchGoogleImage = async (query) => {
+    if (!GOOGLE_SEARCH_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) {
+      console.warn("⚠️ Google Search Key or CX ID is missing!");
+      return null;
+    }
+
+    try {
+      console.log(`[Google Search] 正在搜尋圖片: ${query}`);
+      const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&cx=${GOOGLE_SEARCH_ENGINE_ID}&key=${GOOGLE_SEARCH_API_KEY}&searchType=image&num=1`;
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data.items && data.items.length > 0) {
+        const imgUrl = data.items[0].link;
+        console.log(`[Google Search] 找到圖片: ${imgUrl}`);
+        return imgUrl;
+      }
+    } catch (error) {
+      console.error("[Google Search] 搜尋失敗:", error);
+    }
+    return null;
+  };
 
   // Gemini API 呼叫邏輯
   const callGeminiApi = async (userText, modeKey) => {
@@ -111,13 +140,15 @@ function App() {
     if (!GEMINI_API_KEY) {
       setTimeout(() => {
         console.log("⚠️ No API Key provided, returning mock data.");
+       // 模擬流程
+        const mockName = "測試餐廳-好吃炸雞";
         const mockData = {
-          name: "測試餐廳 (請填入 API Key)",
+          name: mockName,
           image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop",
-          description: "請填入 GEMINI_API_KEY 才能搜尋真實餐廳喔！",
-          time: "10:00–22:00",
-          phone: "02-1234-5678",
-          address: "台北市信義區測試路1號",
+          description: "目前尚未偵測到 API Key。但我已準備好呼叫 Google Search API 來找圖囉！",
+          time: "24H",
+          phone: "0800-000-123",
+          address: "請填入 API Key 即可啟用真實搜尋",
           mapUrl: "https://www.google.com/maps",
         };
         setRestaurant(mockData);
@@ -130,9 +161,7 @@ function App() {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
 
-      const generationConfig = {
-        temperature: 0.7,
-      };
+      const generationConfig = { temperature: 0.7 };
 
       const payload = {
         contents: [{
@@ -142,9 +171,7 @@ function App() {
         }],
         tools: [{ google_search: {} }],
         systemInstruction: {
-          parts: [{
-            text: `${MODE_INSTRUCTIONS[modeKey]}`
-          }]
+          parts: [{ text: `${MODE_INSTRUCTIONS[modeKey]}` }]
         },
         generationConfig: generationConfig
       };
@@ -156,28 +183,36 @@ function App() {
       });
 
       const data = await response.json();
-
+      
       if (data.error) throw new Error(data.error.message);
 
       const candidates = data.candidates;
       if (candidates && candidates.length > 0) {
         let jsonText = candidates[0].content.parts[0].text;
-
         console.log("[Raw AI Output]:", jsonText);
-
-        // 🔥 關鍵修正：使用正規表達式只抓取 { ... } 範圍內的文字
-        // 這樣就算 AI 在前面講廢話，或在後面加註解，我們也能精準抓到 JSON
         const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-
+        
         if (jsonMatch) {
-          jsonText = jsonMatch[0]; // 只取匹配到的 JSON 部分
+          jsonText = jsonMatch[0];
           try {
             const parsed = JSON.parse(jsonText);
+            
+            // 🔥 關鍵步驟：在這裡呼叫 Google Image API
+            // 搜尋策略：餐廳名稱 + "food" 或 "餐點"
+            const realImage = await fetchGoogleImage(`${parsed.name} food`);
+            
+            // 如果找到圖，就覆蓋掉 image 欄位
+            if (realImage) {
+              parsed.image = realImage;
+            } else {
+              // 沒找到就用預設圖
+              parsed.image = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop";
+            }
+
             setRestaurant(parsed);
             setShowResult(true);
           } catch (parseError) {
             console.error("JSON Parse Error:", parseError);
-            console.log("Failed Text:", jsonText);
             alert("AI 回傳格式有誤，請再試一次。");
           }
         } else {
@@ -187,9 +222,14 @@ function App() {
       } else {
         alert("AI 找不到相關餐廳，請再試一次。");
       }
+
     } catch (e) {
       console.error("[API Error]", e);
-      alert(`AI 連線發生錯誤：${e.message}`);
+      if (e.message.includes("403") || e.message.includes("API key not valid")) {
+        alert("API Key 無效。");
+      } else {
+        alert(`AI 連線發生錯誤：${e.message}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -229,9 +269,37 @@ function App() {
     }
   };
 
-  const handleTextSubmit = (e) => {
+  const handleInput = (e) => {
+    setInputText(e.target.value);
+    
+    // 調整高度：先設為 auto 讓它縮回，再設為 scrollHeight 讓它長高
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+
+  // ✅ 新增：處理按鍵事件 (Enter 送出, Shift+Enter 換行)
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault(); // 防止預設換行
+      if (inputText.trim()) {
+        handleSubmit(e);
+      }
+    }
+  };
+
+  const handleSubmit = (e) => {
     e.preventDefault();
+    if (!inputText.trim()) return;
+    
     triggerAI(inputText);
+    setInputText("");
+    
+    // 送出後重置高度
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
   };
 
   return (
@@ -294,16 +362,19 @@ function App() {
           </button>
         </div>
 
-        <form className="input-area" onSubmit={handleTextSubmit}>
-          <input
-            type="text"
-            placeholder={isListening ? "正在聆聽..." : "也可以打字跟我說喔～"}
+        <form className="input-area" onSubmit={handleSubmit}>
+          {/* ✅ 修改：換成 textarea */}
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            placeholder={isListening ? "正在聆聽..." : "也可以打字跟我說喔... (Shift+Enter 換行)"}
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={handleInput}
+            onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
           <button type="submit" className="send-btn" disabled={isLoading}>
-            <Send color="#ffffffff"/>
+            <Send color="#ffffff" size={18} />
           </button>
         </form>
       </main>
