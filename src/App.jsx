@@ -109,6 +109,7 @@ const EMPTY_RESTAURANT = {
   address: "",
   mapUrl: "#",
   bmiInfo: null,
+  imageCandidates: [], // ✅ 新增：存放多張候選圖片的陣列
 };
 
 function App() {
@@ -128,29 +129,22 @@ function App() {
   const recognitionRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // 🔎 新增：呼叫 Google Custom Search API 找圖片
+   // ✅ 修改：現在會回傳「圖片網址陣列 (Array)」，而不是單一字串
   const fetchGoogleImage = async (query) => {
-    if (!GOOGLE_SEARCH_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) {
-      console.warn("⚠️ Google Search Key or CX ID is missing!");
-      return null;
-    }
-
+    if (!GOOGLE_SEARCH_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) return [];
     try {
-      console.log(`[Google Search] 正在搜尋圖片: ${query}`);
-      const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&cx=${GOOGLE_SEARCH_ENGINE_ID}&key=${GOOGLE_SEARCH_API_KEY}&searchType=image&num=1`;
-      
+      // ✅ 參數調整：
+      // num=5: 一次抓 5 張
+      // imgType=photo: 只要照片 (排除 clipart 或 lineart)
+      const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&cx=${GOOGLE_SEARCH_ENGINE_ID}&key=${GOOGLE_SEARCH_API_KEY}&searchType=image&num=5&imgType=photo&safe=active`;
       const res = await fetch(url);
       const data = await res.json();
       
       if (data.items && data.items.length > 0) {
-        const imgUrl = data.items[0].link;
-        console.log(`[Google Search] 找到圖片: ${imgUrl}`);
-        return imgUrl;
+        return data.items.map(item => item.link); // 回傳所有圖片連結的陣列
       }
-    } catch (error) {
-      console.error("[Google Search] 搜尋失敗:", error);
-    }
-    return null;
+    } catch (error) { console.error(error); }
+    return [];
   };
 
   // ✅ 新增：計算 BMI 的函式
@@ -221,71 +215,52 @@ function App() {
 
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
-
-      const generationConfig = { temperature: 0.7 };
-
       const payload = {
-        contents: [{
-          parts: [{ text: finalPrompt }]
-        }],
+        contents: [{ parts: [{ text: finalPrompt }] }],
         tools: [{ google_search: {} }],
-        systemInstruction: {
-          parts: [{ text: `${MODE_INSTRUCTIONS[modeKey]}` }]
-        },
-        generationConfig: generationConfig
+        systemInstruction: { parts: [{ text: MODE_INSTRUCTIONS[modeKey] }] }
       };
 
       const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API Error Details:", errorData);
+        if (response.status === 403) {
+          throw new Error("API Key 被拒絕 (403)。請檢查 Google Console 的 Referer 限制是否正確包含此網址。");
+        }
+        throw new Error(errorData.error?.message || "API 連線失敗");
+      }
 
       const data = await response.json();
-      
-      if (data.error) throw new Error(data.error.message);
-
       const candidates = data.candidates;
       if (candidates && candidates.length > 0) {
         let jsonText = candidates[0].content.parts[0].text;
         const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-        
         if (jsonMatch) {
-          jsonText = jsonMatch[0];
-          try {
-            const parsed = JSON.parse(jsonText);
-            const realImage = await fetchGoogleImage(`${parsed.name} 美食`);
-            
-            if (realImage) {
-              parsed.image = realImage;
-            } else {
-              parsed.image = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop";
-            }
-
-            // ✅ 將 BMI 資訊塞入物件中，以便前端顯示
-            parsed.bmiInfo = bmiData;
-
-            setRestaurant(parsed);
-            setShowResult(true);
-          } catch (parseError) {
-            console.error("JSON Parse Error:", parseError);
-            alert("AI 回傳格式有誤，請再試一次。");
+          const parsed = JSON.parse(jsonMatch[0]);
+          const imageList = await fetchGoogleImage(`${parsed.name} 美食`);
+          if (imageList && imageList.length > 0) {
+            parsed.image = imageList[0];
+            parsed.imageCandidates = imageList;
+          } else {
+            parsed.image = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop";
+            parsed.imageCandidates = [];
           }
-        } else {
-          console.error("No JSON found in response");
-          alert("AI 沒有回傳正確的餐廳資料，請再試一次。");
-        }
-      } else {
-        alert("AI 找不到相關餐廳，請再試一次。");
-      }
+          
+          // 強制使用標準 Google Maps 搜尋連結格式
+          const query = `${parsed.name} ${parsed.address}`;
+          parsed.mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 
-    } catch (e) {
-      console.error("[API Error]", e);
-      if (e.message.includes("403") || e.message.includes("key")) {
-        alert("API Key 無效或被鎖定。");
-      } else {
-        alert(`AI 連線發生錯誤：${e.message}`);
+          parsed.bmiInfo = bmiData;
+          setRestaurant(parsed);
+          setShowResult(true);
+        }
       }
+    } catch (e) {
+      alert(`錯誤：${e.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -294,7 +269,7 @@ function App() {
   const triggerAI = useCallback((text) => {
     if (!text.trim()) return;
     callGeminiApi(text, currentMode.key);
-  }, [currentMode, userWeight, userGender]);
+  }, [currentMode, userHeight, userWeight, userGender, userGoal]); 
 
   // 語音辨識設定
   useEffect(() => {
@@ -355,6 +330,27 @@ function App() {
     // 送出後重置高度
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
+    }
+  };
+
+  const handleImageError = (e) => {
+    const currentSrc = e.target.src;
+    const candidates = restaurant.imageCandidates || [];
+    
+    const idx = candidates.indexOf(currentSrc);
+    
+    if (idx !== -1 && idx < candidates.length - 1) {
+      console.log(`圖片載入失敗，嘗試下一張候選圖 (${idx + 2}/${candidates.length})...`);
+      e.target.src = candidates[idx + 1];
+      
+      setRestaurant(prev => ({
+        ...prev,
+        image: candidates[idx + 1]
+      }));
+    } else {
+      console.log("所有候選圖片都失效，切換為預設圖。");
+      e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop";
+      e.target.onerror = null; 
     }
   };
 
@@ -545,11 +541,12 @@ function App() {
             </button>
 
             <div className="result-image-wrapper">
-              <img
-                src={restaurant.image}
-                alt={restaurant.name}
-                className="result-image"
-                onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop" }}
+              {/* ✅ 套用新的 Error Handler */}
+              <img 
+                src={restaurant.image} 
+                alt={restaurant.name} 
+                className="result-image" 
+                onError={handleImageError} 
               />
             </div>
 
