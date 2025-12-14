@@ -59,10 +59,22 @@ const COMMON_INSTRUCTION = `
 const MODE_INSTRUCTIONS = {
   normal: `
   ${COMMON_INSTRUCTION}
-  角色：溫柔貼心的健康美食助理。
-  任務：請根據使用者的「性別」與「體重」來評估適合的餐點熱量與份量。
-  邏輯：
-  - 語氣：像專業營養師一樣溫暖，說明為什麼這家店適合他的身體數值。
+  角色：專業且貼心的健康飲食顧問。
+  任務：你已經知道使用者的「性別」、「身高」、「體重」以及最重要的「飲食目標」。
+  
+  【核心推薦邏輯】：
+  1. 優先順序：使用者的「飲食目標」> BMI 建議。
+     - 意思就是：如果使用者 BMI 顯示過重，但他明確表示目標是「增重/增肌」，請尊重他的選擇，推薦高熱量/高蛋白食物，不要說教，但可以溫馨提醒搭配運動。
+     - 如果使用者 BMI 過輕，但他目標是「減脂」，請溫柔提醒他已經很瘦了，並推薦營養均衡、低負擔但熱量足夠的食物，不要讓他餓到。
+  
+  2. 根據目標推薦：
+     - 🥬 減脂：推薦原型食物、低卡、健康餐、海鮮、雞胸肉。
+     - ⚖️ 均衡：推薦一般美味餐廳、日式定食、家常菜。
+     - 💪 增肌/增重：推薦高蛋白、肉量多、優質澱粉、火鍋、牛排、丼飯。
+  
+  3. 語氣：
+     - 溫暖、專業、不帶批判性。
+     - 在描述中，請簡單提到為什麼這家餐廳適合達成他的目標。
   `,
 
   friend: `
@@ -96,6 +108,7 @@ const EMPTY_RESTAURANT = {
   phone: "",
   address: "",
   mapUrl: "#",
+  bmiInfo: null,
 };
 
 function App() {
@@ -107,8 +120,10 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
 
   // ✅ 新增：使用者資料 State
-  const [userWeight, setUserWeight] = useState("50");
-  const [userGender, setUserGender] = useState("female"); // 'male' or 'female'
+  const [userHeight, setUserHeight] = useState("165");
+  const [userWeight, setUserWeight] = useState("55");
+  const [userGender, setUserGender] = useState("female"); 
+  const [userGoal, setUserGoal] = useState("maintain");
 
   const recognitionRef = useRef(null);
   const textareaRef = useRef(null);
@@ -138,39 +153,69 @@ function App() {
     return null;
   };
 
-  // Gemini API 呼叫邏輯
-  const callGeminiApi = async (userText, modeKey) => {
-    setIsLoading(true);
-    console.log(`%c[Gemini API] Mode: ${modeKey}`, "color: cyan; font-weight: bold;");
-
-    // ✅ 建構 Prompt：如果是一般模式，把體重和性別加進去
-    let finalPrompt = `使用者需求：${userText}。`;
+  // ✅ 新增：計算 BMI 的函式
+  const calculateBMI = (h, w) => {
+    const heightInM = parseFloat(h) / 100;
+    const weight = parseFloat(w);
+    if (!heightInM || !weight) return null;
     
-    if (modeKey === 'normal') {
-      const genderText = userGender === 'male' ? '男性' : '女性';
-      finalPrompt += `\n【使用者身體數據】\n性別：${genderText}\n體重：${userWeight}kg\n請根據這些數據，推薦適合他/她的份量與熱量的餐廳。`;
-    }
-    finalPrompt += `\n請搜尋真實餐廳並回傳嚴格的 JSON 格式，不要有任何 Markdown。`;
-    console.log(`%c[Gemini Prompt]`, "color: cyan;", finalPrompt);
+    const bmi = (weight / (heightInM * heightInM)).toFixed(1);
+    let status = "";
+    
+    if (bmi < 18.5) status = "體重過輕";
+    else if (bmi < 24) status = "正常範圍";
+    else if (bmi < 27) status = "體重過重";
+    else status = "輕度肥胖以上";
 
+    return { value: bmi, status: status };
+  };
+
+  // Gemini API 呼叫邏輯
+   const callGeminiApi = async (userText, modeKey) => {
+    setIsLoading(true);
+    
+    let finalPrompt = `使用者需求：${userText}。`;
+    let bmiData = null;
+    
+    // ✅ 修改：傳送完整數據給 AI，並計算 BMI
+    if (modeKey === 'normal') {
+      bmiData = calculateBMI(userHeight, userWeight);
+      const genderText = userGender === 'male' ? '男性' : '女性';
+      const goalMap = {
+        lose: '減脂/減重',
+        maintain: '維持/均衡',
+        gain: '增肌/增重'
+      };
+      
+      finalPrompt += `\n【使用者身體數據與目標】\n性別：${genderText}\n身高：${userHeight}cm\n體重：${userWeight}kg\nBMI：${bmiData?.value} (${bmiData?.status})\n飲食目標：${goalMap[userGoal]}\n\n請注意：即使BMI顯示需要調整體重，仍須優先「尊重使用者的飲食目標」。例如：BMI過重但想增肌/增重，請推薦高蛋白食物；BMI過輕但想減脂，請溫柔提醒並推薦營養均衡的食物。`;
+    }
+
+    finalPrompt += `\n請搜尋真實餐廳並回傳嚴格的 JSON 格式，不要有任何 Markdown。`;
+
+    console.log(`%c[Gemini Prompt]`, "color: cyan;", finalPrompt);
+    
     if (!GEMINI_API_KEY) {
-      setTimeout(() => {
-        console.log("⚠️ No API Key provided, returning mock data.");
-       // 模擬流程
-        const mockName = "測試餐廳-好吃炸雞";
+      setTimeout(async () => {
+        const mockName = "測試餐廳-健康輕食";
+        let realImage = null;
+        if (GOOGLE_SEARCH_API_KEY) {
+           realImage = await fetchGoogleImage(`${mockName} 美食`);
+        }
+
         const mockData = {
           name: mockName,
-          image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop",
-          description: `(測試模式) 因為你是${userGender === 'male' ? '男生' : '女生'}且體重${userWeight}kg，推薦你這家份量剛好的店！(請設定 API Key 以啟用 AI)`,
+          image: realImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop",
+          description: `(測試模式) 您的BMI為 ${bmiData?.value}，既然你想${userGoal}，這家店很適合你！(請設定 API Key 以啟用 AI)`,
           time: "11:00-20:00",
           phone: "02-1234-5678",
           address: "台北市信義區測試路101號",
           mapUrl: "https://www.google.com/maps",
+          bmiInfo: bmiData, // 傳遞 BMI 資訊給結果視窗
         };
         setRestaurant(mockData);
         setShowResult(true);
         setIsLoading(false);
-      }, 1000); //  Loading 動畫
+      }, 1000); 
       return;
     }
 
@@ -181,9 +226,7 @@ function App() {
 
       const payload = {
         contents: [{
-          parts: [{
-            text: `使用者需求：${userText}。請搜尋真實餐廳並回傳嚴格的 JSON 格式，不要有任何 Markdown。`
-          }]
+          parts: [{ text: finalPrompt }]
         }],
         tools: [{ google_search: {} }],
         systemInstruction: {
@@ -205,25 +248,22 @@ function App() {
       const candidates = data.candidates;
       if (candidates && candidates.length > 0) {
         let jsonText = candidates[0].content.parts[0].text;
-        console.log("[Raw AI Output]:", jsonText);
         const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
         
         if (jsonMatch) {
           jsonText = jsonMatch[0];
           try {
             const parsed = JSON.parse(jsonText);
+            const realImage = await fetchGoogleImage(`${parsed.name} 美食`);
             
-            // 🔥 關鍵步驟：在這裡呼叫 Google Image API
-            // 搜尋策略：餐廳名稱 + "food" 或 "餐點"
-            const realImage = await fetchGoogleImage(`${parsed.name} food`);
-            
-            // 如果找到圖，就覆蓋掉 image 欄位
             if (realImage) {
               parsed.image = realImage;
             } else {
-              // 沒找到就用預設圖
               parsed.image = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop";
             }
+
+            // ✅ 將 BMI 資訊塞入物件中，以便前端顯示
+            parsed.bmiInfo = bmiData;
 
             setRestaurant(parsed);
             setShowResult(true);
@@ -241,8 +281,8 @@ function App() {
 
     } catch (e) {
       console.error("[API Error]", e);
-      if (e.message.includes("403") || e.message.includes("API key not valid")) {
-        alert("API Key 無效。");
+      if (e.message.includes("403") || e.message.includes("key")) {
+        alert("API Key 無效或被鎖定。");
       } else {
         alert(`AI 連線發生錯誤：${e.message}`);
       }
@@ -365,40 +405,80 @@ function App() {
       
 
        <main className="app-main">
-        {/* ✅ 新增：只在一般模式顯示的資料輸入卡片 */}
         {currentMode.key === 'normal' && (
           <div className="profile-card">
+            {/* 1. 性別 */}
             <div className="profile-item">
-              <span className="profile-label">體重 (kg)</span>
-              <div className="profile-weight-input">
+              <span className="profile-label">性別</span>
+              <div className="profile-input-group">
+                <button 
+                  className={`option-btn ${userGender === 'male' ? 'active' : ''}`}
+                  onClick={() => setUserGender('male')}
+                >
+                  男
+                </button>
+                <button 
+                  className={`option-btn ${userGender === 'female' ? 'active' : ''}`}
+                  onClick={() => setUserGender('female')}
+                >
+                  女
+                </button>
+              </div>
+            </div>
+
+            {/* 2. 身高 (新增) */}
+            <div className="profile-item">
+              <span className="profile-label">身高(cm)</span>
+              <div className="profile-input-group">
                 <input 
                   type="number" 
-                  className="weight-input" 
+                  className="num-input" 
+                  value={userHeight}
+                  onChange={(e) => setUserHeight(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* 3. 體重 */}
+            <div className="profile-item">
+              <span className="profile-label">體重(kg)</span>
+              <div className="profile-input-group">
+                <input 
+                  type="number" 
+                  className="num-input" 
                   value={userWeight}
                   onChange={(e) => setUserWeight(e.target.value)}
                 />
               </div>
             </div>
             
+            {/* 4. 目標 */}
             <div className="profile-item">
-              <span className="profile-label">性別</span>
+              <span className="profile-label">目標</span>
               <div className="profile-input-group">
                 <button 
-                  className={`gender-btn ${userGender === 'male' ? 'active' : ''}`}
-                  onClick={() => setUserGender('male')}
+                  className={`option-btn ${userGoal === 'lose' ? 'active' : ''}`}
+                  onClick={() => setUserGoal('lose')}
                 >
-                  男性
+                  減脂
                 </button>
                 <button 
-                  className={`gender-btn ${userGender === 'female' ? 'active' : ''}`}
-                  onClick={() => setUserGender('female')}
+                  className={`option-btn ${userGoal === 'maintain' ? 'active' : ''}`}
+                  onClick={() => setUserGoal('maintain')}
                 >
-                  女性
+                  均衡
+                </button>
+                <button 
+                  className={`option-btn ${userGoal === 'gain' ? 'active' : ''}`}
+                  onClick={() => setUserGoal('gain')}
+                >
+                  增肌
                 </button>
               </div>
             </div>
           </div>
         )}
+
 
         <div className="mic-container">
           <div className="prompt-text">
@@ -418,7 +498,7 @@ function App() {
           <textarea
             ref={textareaRef}
             rows={1}
-            placeholder={isListening ? "正在聆聽..." : "也可以打字跟我說喔... (Shift+Enter 換行)"}
+            placeholder={isListening ? "正在聆聽..." : "也可以打字跟我說喔 (Shift+Enter 換行)"}
             value={inputText}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
@@ -474,9 +554,17 @@ function App() {
             </div>
 
             <div className="result-content">
+              {/* ✅ 新增：在一般模式顯示 BMI 區塊 */}
+              {currentMode.key === 'normal' && restaurant.bmiInfo && (
+                <div className={`bmi-banner ${restaurant.bmiInfo.value >= 24 || restaurant.bmiInfo.value < 18.5 ? 'warning' : ''}`}>
+                  <span>你的 BMI：<strong>{restaurant.bmiInfo.value}</strong></span>
+                  <span>{restaurant.bmiInfo.status}</span>
+                </div>
+              )}
+
               <div className="info-row name">{restaurant.name}</div>
               <p className="result-description">{restaurant.description}</p>
-
+              
               <div className="info-row">
                 <Clock size={16} /> {restaurant.time || "營業時間未提供"}
               </div>
