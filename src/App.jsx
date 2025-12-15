@@ -2,6 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, Send, X, MapPin, Phone, Clock, Loader2 } from "lucide-react";
 import "./App.css";
 import bossBg from "./assets/霸總.png";
+import logo from "./assets/Logo.png";
+import balanced from "./assets/均衡.png";
+import muscle from "./assets/增肌.png";
+import fat from "./assets/減脂.png";
+import vegetarian from "./assets/素食.png";
+import meat from "./assets/葷食.png";
 
 // =========================
 // 🔥🔑 Gemini API Key and Custom Search API
@@ -16,7 +22,7 @@ const MODES = {
     key: "normal",
     label: "一般模式",
     bg: "https://images.unsplash.com/photo-1445116572660-236099ec97a0?q=80&w=2071&auto=format&fit=crop",
-    startText: "今天想吃什麼呢？讓我來幫你推薦吧！😊"
+    startText: "想吃什麼？讓我根據你的身體狀況幫你推薦吧！😊"
   },
   friend: {
     key: "friend",
@@ -60,22 +66,26 @@ const MODE_INSTRUCTIONS = {
   normal: `
   ${COMMON_INSTRUCTION}
   角色：專業且貼心的健康飲食顧問。
-  任務：你已經知道使用者的「性別」、「身高」、「體重」以及最重要的「飲食目標」。
+  任務：你已經知道使用者的「性別」、「身高」、「體重」、「飲食偏好(葷/素)」以及最重要的「飲食目標」。
   
   【核心推薦邏輯】：
-  1. 優先順序：使用者的「飲食目標」> BMI 建議。
-     - 意思就是：如果使用者 BMI 顯示過重，但他明確表示目標是「增重/增肌」，請尊重他的選擇，推薦高熱量/高蛋白食物，不要說教，但可以溫馨提醒搭配運動。
-     - 如果使用者 BMI 過輕，但他目標是「減脂」，請溫柔提醒他已經很瘦了，並推薦營養均衡、低負擔但熱量足夠的食物，不要讓他餓到。
+  1. 優先順序：**使用者的「飲食目標」> BMI 建議**。
+     - 如果使用者 BMI 過重但目標是「增重/增肌」，請**尊重他的選擇**，推薦高蛋白食物。
+     - 如果使用者 BMI 過輕但目標是「減脂」，請**溫柔提醒**並推薦營養均衡的食物。
   
-  2. 根據目標推薦：
-     - 🥬 減脂：推薦原型食物、低卡、健康餐、海鮮、雞胸肉。
-     - ⚖️ 均衡：推薦一般美味餐廳、日式定食、家常菜。
-     - 💪 增肌/增重：推薦高蛋白、肉量多、優質澱粉、火鍋、牛排、丼飯。
+  2. 飲食偏好：
+     - 如果是「素食」，請務必推薦素食餐廳或有豐富素食選項的店家。
   
-  3. 語氣：
-     - 溫暖、專業、不帶批判性。
-     - 在描述中，請簡單提到為什麼這家餐廳適合達成他的目標。
-  `,
+  3. 推薦方向：
+     - 減脂：低卡、原型食物、海鮮、雞胸肉。
+     - 均衡：一般美味餐廳、定食。
+     - 增肌：高蛋白、肉量多、優質澱粉。
+
+  4. 特殊情境 (阻止機制)：
+     - 如果 BMI 過重且想減脂，但卻點了「炸雞/吃到飽」，請**溫柔阻止**並推薦替代方案。
+  
+  語氣：溫暖、專業、不帶批判性。
+   `,
 
   friend: `
   ${COMMON_INSTRUCTION}
@@ -123,13 +133,14 @@ function App() {
   // ✅ 新增：使用者資料 State
   const [userHeight, setUserHeight] = useState("165");
   const [userWeight, setUserWeight] = useState("55");
-  const [userGender, setUserGender] = useState("female"); 
+  const [userGender, setUserGender] = useState("female");
   const [userGoal, setUserGoal] = useState("maintain");
+  const [userDiet, setUserDiet] = useState("meat"); // 新增：素食/葷食
 
   const recognitionRef = useRef(null);
   const textareaRef = useRef(null);
 
-   // ✅ 修改：現在會回傳「圖片網址陣列 (Array)」，而不是單一字串
+  // ✅ 修改：現在會回傳「圖片網址陣列 (Array)」，而不是單一字串
   const fetchGoogleImage = async (query) => {
     if (!GOOGLE_SEARCH_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) return [];
     try {
@@ -139,7 +150,7 @@ function App() {
       const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&cx=${GOOGLE_SEARCH_ENGINE_ID}&key=${GOOGLE_SEARCH_API_KEY}&searchType=image&num=5&imgType=photo&safe=active`;
       const res = await fetch(url);
       const data = await res.json();
-      
+
       if (data.items && data.items.length > 0) {
         return data.items.map(item => item.link); // 回傳所有圖片連結的陣列
       }
@@ -152,10 +163,10 @@ function App() {
     const heightInM = parseFloat(h) / 100;
     const weight = parseFloat(w);
     if (!heightInM || !weight) return null;
-    
+
     const bmi = (weight / (heightInM * heightInM)).toFixed(1);
     let status = "";
-    
+
     if (bmi < 18.5) status = "體重過輕";
     else if (bmi < 24) status = "正常範圍";
     else if (bmi < 27) status = "體重過重";
@@ -165,12 +176,12 @@ function App() {
   };
 
   // Gemini API 呼叫邏輯
-   const callGeminiApi = async (userText, modeKey) => {
+  const callGeminiApi = async (userText, modeKey) => {
     setIsLoading(true);
-    
+
     let finalPrompt = `使用者需求：${userText}。`;
     let bmiData = null;
-    
+
     // ✅ 修改：傳送完整數據給 AI，並計算 BMI
     if (modeKey === 'normal') {
       bmiData = calculateBMI(userHeight, userWeight);
@@ -180,20 +191,21 @@ function App() {
         maintain: '維持/均衡',
         gain: '增肌/增重'
       };
-      
-      finalPrompt += `\n【使用者身體數據與目標】\n性別：${genderText}\n身高：${userHeight}cm\n體重：${userWeight}kg\nBMI：${bmiData?.value} (${bmiData?.status})\n飲食目標：${goalMap[userGoal]}\n\n請注意：即使BMI顯示需要調整體重，仍須優先「尊重使用者的飲食目標」。例如：BMI過重但想增肌/增重，請推薦高蛋白食物；BMI過輕但想減脂，請溫柔提醒並推薦營養均衡的食物。`;
+      const dietText = userDiet === 'veg' ? '素食' : '葷食';
+
+      finalPrompt += `\n【使用者身體數據與目標】\n性別：${genderText}\n飲食偏好：${dietText}\n身高：${userHeight}cm\n體重：${userWeight}kg\nBMI：${bmiData?.value} (${bmiData?.status})\n飲食目標：${goalMap[userGoal]}\n\n請注意：即使BMI顯示需要調整體重，仍須優先「尊重使用者的飲食目標」。例如：BMI過重但想增肌/增重，請推薦高蛋白食物；BMI過輕但想減脂，請溫柔提醒並推薦營養均衡的食物。`;
     }
 
     finalPrompt += `\n請搜尋真實餐廳並回傳嚴格的 JSON 格式，不要有任何 Markdown。`;
 
     console.log(`%c[Gemini Prompt]`, "color: cyan;", finalPrompt);
-    
+
     if (!GEMINI_API_KEY) {
       setTimeout(async () => {
         const mockName = "測試餐廳-健康輕食";
         let realImage = null;
         if (GOOGLE_SEARCH_API_KEY) {
-           realImage = await fetchGoogleImage(`${mockName} 美食`);
+          realImage = await fetchGoogleImage(`${mockName} 美食`);
         }
 
         const mockData = {
@@ -209,7 +221,7 @@ function App() {
         setRestaurant(mockData);
         setShowResult(true);
         setIsLoading(false);
-      }, 1000); 
+      }, 1000);
       return;
     }
 
@@ -224,7 +236,7 @@ function App() {
       const response = await fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         console.error("API Error Details:", errorData);
@@ -249,7 +261,7 @@ function App() {
             parsed.image = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop";
             parsed.imageCandidates = [];
           }
-          
+
           // 強制使用標準 Google Maps 搜尋連結格式
           const query = `${parsed.name} ${parsed.address}`;
           parsed.mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
@@ -269,7 +281,7 @@ function App() {
   const triggerAI = useCallback((text) => {
     if (!text.trim()) return;
     callGeminiApi(text, currentMode.key);
-  }, [currentMode, userHeight, userWeight, userGender, userGoal]); 
+  }, [currentMode, userHeight, userWeight, userGender, userGoal, userDiet]);
 
   // 語音辨識設定
   useEffect(() => {
@@ -302,7 +314,7 @@ function App() {
 
   const handleInput = (e) => {
     setInputText(e.target.value);
-    
+
     // 調整高度：先設為 auto 讓它縮回，再設為 scrollHeight 讓它長高
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -323,10 +335,10 @@ function App() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    
+
     triggerAI(inputText);
     setInputText("");
-    
+
     // 送出後重置高度
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -336,13 +348,13 @@ function App() {
   const handleImageError = (e) => {
     const currentSrc = e.target.src;
     const candidates = restaurant.imageCandidates || [];
-    
+
     const idx = candidates.indexOf(currentSrc);
-    
+
     if (idx !== -1 && idx < candidates.length - 1) {
       console.log(`圖片載入失敗，嘗試下一張候選圖 (${idx + 2}/${candidates.length})...`);
       e.target.src = candidates[idx + 1];
-      
+
       setRestaurant(prev => ({
         ...prev,
         image: candidates[idx + 1]
@@ -350,7 +362,7 @@ function App() {
     } else {
       console.log("所有候選圖片都失效，切換為預設圖。");
       e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop";
-      e.target.onerror = null; 
+      e.target.onerror = null;
     }
   };
 
@@ -383,7 +395,7 @@ function App() {
       <header className="app-header">
         <div className="header-inner">
           <div className="header-left">
-            <div className="logo">Peini Order</div>
+            <img src={logo} alt="logo" className="logo" />
           </div>
           <div className="header-right">
             {Object.values(MODES).map((m) => (
@@ -398,114 +410,107 @@ function App() {
           </div>
         </div>
       </header>
-      
 
-       <main className="app-main">
-        {currentMode.key === 'normal' && (
+
+      <main className="app-main">
+        {currentMode.key === 'normal' ? (
           <div className="profile-card">
-            {/* 1. 性別 */}
-            <div className="profile-item">
-              <span className="profile-label">性別</span>
-              <div className="profile-input-group">
-                <button 
-                  className={`option-btn ${userGender === 'male' ? 'active' : ''}`}
-                  onClick={() => setUserGender('male')}
-                >
-                  男
+
+            {/* Step 1: 基本資料 */}
+            <div className="step-section">
+              <div className="step-header">
+                <span className="step-tag">Step 1</span>
+                <h3 className="step-title">基本資料</h3>
+              </div>
+
+              <div className="options-row">
+                <button className={`gender-btn ${userGender === 'male' ? 'active' : ''}`} onClick={() => setUserGender('male')}>
+                  <span className="icon-placeholder"><img src="https://api.iconify.design/ph:gender-male-bold.svg" alt="Male" /></span>
+                  男性
                 </button>
-                <button 
-                  className={`option-btn ${userGender === 'female' ? 'active' : ''}`}
-                  onClick={() => setUserGender('female')}
-                >
-                  女
+                <button className={`gender-btn ${userGender === 'female' ? 'active' : ''}`} onClick={() => setUserGender('female')}>
+                  <span className="icon-placeholder"><img src="https://api.iconify.design/ph:gender-female-bold.svg" alt="Female" /></span>
+                  女性
                 </button>
+              </div>
+
+              <div className="options-row">
+                <button className={`choice-btn ${userDiet === 'veg' ? 'active' : ''}`} onClick={() => setUserDiet('veg')}>
+                  <span className="icon-placeholder"><img src={vegetarian} alt="Veg" /></span>
+                  素食
+                </button>
+                <button className={`choice-btn ${userDiet === 'meat' ? 'active' : ''}`} onClick={() => setUserDiet('meat')}>
+                  <span className="icon-placeholder"><img src={meat} alt="Meat" /></span>
+                  葷食
+                </button>
+              </div>
+
+              <div className="input-grid">
+                <div className="data-input-wrapper">
+                  <input type="number" className="data-input" value={userHeight} onChange={(e) => setUserHeight(e.target.value)} />
+                  <span className="unit-label">cm</span>
+                </div>
+                <div className="data-input-wrapper">
+                  <input type="number" className="data-input" value={userWeight} onChange={(e) => setUserWeight(e.target.value)} />
+                  <span className="unit-label">kg</span>
+                </div>
               </div>
             </div>
 
-            {/* 2. 身高 (新增) */}
-            <div className="profile-item">
-              <span className="profile-label">身高(cm)</span>
-              <div className="profile-input-group">
-                <input 
-                  type="number" 
-                  className="num-input" 
-                  value={userHeight}
-                  onChange={(e) => setUserHeight(e.target.value)}
-                />
+            {/* Step 2: 今日目標 & 麥克風 */}
+            <div className="step-section">
+              <div className="step-header">
+                <span className="step-tag">Step 2</span>
+                <h3 className="step-title">今日目標</h3>
+              </div>
+
+              <div className="step2-layout">
+                <div className="step2-left">
+                  <div className="options-row">
+                    <button className={`choice-btn ${userGoal === 'lose' ? 'active' : ''}`} onClick={() => setUserGoal('lose')}>
+                      <span className="icon-placeholder"><img src={fat} alt="Lose" /></span>
+                      減脂
+                    </button>
+                    <button className={`choice-btn ${userGoal === 'maintain' ? 'active' : ''}`} onClick={() => setUserGoal('maintain')}>
+                      <span className="icon-placeholder"><img src={balanced} alt="Maintain" /></span>
+                      均衡
+                    </button>
+                    <button className={`choice-btn ${userGoal === 'gain' ? 'active' : ''}`} onClick={() => setUserGoal('gain')}>
+                      <span className="icon-placeholder"><img src={muscle} alt="Gain" /></span>
+                      增肌
+                    </button>
+                  </div>
+                  <div className="card-prompt">
+                    <p>{isLoading ? "..." : currentMode.startText}</p>
+                    {/* ✅ 移入卡片內的麥克風 */}
+                    <button
+                      className={`card-mic-btn ${isListening ? "active" : ""}`}
+                      onClick={handleMicClick}
+                      disabled={isLoading}
+                    >
+                      <Mic color="#ffffff" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* 3. 體重 */}
-            <div className="profile-item">
-              <span className="profile-label">體重(kg)</span>
-              <div className="profile-input-group">
-                <input 
-                  type="number" 
-                  className="num-input" 
-                  value={userWeight}
-                  onChange={(e) => setUserWeight(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            {/* 4. 目標 */}
-            <div className="profile-item">
-              <span className="profile-label">目標</span>
-              <div className="profile-input-group">
-                <button 
-                  className={`option-btn ${userGoal === 'lose' ? 'active' : ''}`}
-                  onClick={() => setUserGoal('lose')}
-                >
-                  減脂
-                </button>
-                <button 
-                  className={`option-btn ${userGoal === 'maintain' ? 'active' : ''}`}
-                  onClick={() => setUserGoal('maintain')}
-                >
-                  均衡
-                </button>
-                <button 
-                  className={`option-btn ${userGoal === 'gain' ? 'active' : ''}`}
-                  onClick={() => setUserGoal('gain')}
-                >
-                  增肌
-                </button>
-              </div>
-            </div>
+          </div>
+        ) : (
+          /* ✅ 非一般模式：顯示原本的 Mic 與 Start Text */
+          <div className="mic-container">
+            <div className="prompt-text">{isLoading ? "..." : currentMode.startText}</div>
+            <button className={`mic-button ${isListening ? "mic-button-active" : ""}`} onClick={handleMicClick} disabled={isLoading}>
+              <Mic color="#ffffff" />
+            </button>
           </div>
         )}
 
-
-        <div className="mic-container">
-          <div className="prompt-text">
-            {isLoading ? "..." : currentMode.startText}
-          </div>
-          
-          <button 
-            className={`mic-button ${isListening ? "mic-button-active" : ""}`}
-            onClick={handleMicClick}
-            disabled={isLoading}
-          >
-            <Mic color="#ffffff" />
-          </button>
-        </div>
-        
         <form className="input-area" onSubmit={handleSubmit}>
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            placeholder={isListening ? "正在聆聽..." : "也可以打字跟我說喔 (Shift+Enter 換行)"}
-            value={inputText}
-            onChange={handleInput}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-          />
-          <button type="submit" className="send-btn" disabled={isLoading}>
-            <Send color="#ffffff" size={18} />
-          </button>
+          <textarea ref={textareaRef} rows={1} placeholder={isListening ? "正在聆聽..." : "也可以打字跟我說喔... (Shift+Enter 換行)"} value={inputText} onChange={handleInput} onKeyDown={handleKeyDown} disabled={isLoading} />
+          <button type="submit" className="send-btn" disabled={isLoading}><Send color="#ffffff" size={18} /></button>
         </form>
       </main>
-
 
       {showResult && (
         <div className="result-overlay" onClick={() => setShowResult(false)}>
@@ -542,11 +547,11 @@ function App() {
 
             <div className="result-image-wrapper">
               {/* ✅ 套用新的 Error Handler */}
-              <img 
-                src={restaurant.image} 
-                alt={restaurant.name} 
-                className="result-image" 
-                onError={handleImageError} 
+              <img
+                src={restaurant.image}
+                alt={restaurant.name}
+                className="result-image"
+                onError={handleImageError}
               />
             </div>
 
@@ -561,7 +566,7 @@ function App() {
 
               <div className="info-row name">{restaurant.name}</div>
               <p className="result-description">{restaurant.description}</p>
-              
+
               <div className="info-row">
                 <Clock size={16} /> {restaurant.time || "營業時間未提供"}
               </div>
