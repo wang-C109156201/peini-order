@@ -13,7 +13,7 @@ import meat from "./assets/葷食.png";
 // 🔥🔑 Gemini API Key and Custom Search API
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const GOOGLE_SEARCH_ENGINE_ID = import.meta.env.VITE_SEARCH_ENGINE_ID || "";
-const GOOGLE_SEARCH_API_KEY = import.meta.env.VITE_GOOGLE_SEARCH_KEY || "";
+// const GOOGLE_SEARCH_API_KEY = import.meta.env.VITE_GOOGLE_SEARCH_KEY || "";
 // =========================
 
 // 模式設定
@@ -142,12 +142,12 @@ function App() {
 
   // ✅ 修改：現在會回傳「圖片網址陣列 (Array)」，而不是單一字串
   const fetchGoogleImage = async (query) => {
-    if (!GOOGLE_SEARCH_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) return [];
+    if (!GEMINI_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) return [];
     try {
       // ✅ 參數調整：
       // num=5: 一次抓 5 張
       // imgType=photo: 只要照片 (排除 clipart 或 lineart)
-      const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&cx=${GOOGLE_SEARCH_ENGINE_ID}&key=${GOOGLE_SEARCH_API_KEY}&searchType=image&num=5&imgType=photo&safe=active`;
+      const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&cx=${GOOGLE_SEARCH_ENGINE_ID}&key=${GEMINI_API_KEY}&searchType=image&num=5&imgType=photo&safe=active`;
       const res = await fetch(url);
       const data = await res.json();
 
@@ -204,7 +204,7 @@ function App() {
       setTimeout(async () => {
         const mockName = "測試餐廳-健康輕食";
         let realImage = null;
-        if (GOOGLE_SEARCH_API_KEY) {
+        if (GEMINI_API_KEY) {
           realImage = await fetchGoogleImage(`${mockName} 美食`);
         }
 
